@@ -235,3 +235,26 @@ Xcode n'est pas touché : il utilise son propre linker et ne lit pas ce `PATH`.
 Les règles globales s'appliquent : **tout ce qui vit dans git s'écrit en anglais** —
 messages de commit, noms de branches, titres et descriptions de MR, tags. Les échanges
 avec Florent restent en français.
+
+### Branches
+
+| Branche | Rôle |
+|---|---|
+| `main` | Les versions publiées. Chaque commit y porte un tag, et c'est ce que les apps consomment. |
+| `develop` | Le travail en cours. C'est la branche par défaut du quotidien. |
+
+On commite **directement sur `develop`**, sans branche de feature ni PR : Florent est seul
+sur le dépôt, une PR n'apporte aucune relecture.
+
+`main` ne bouge qu'au moment de publier : on y merge `develop`, on tague, on pousse les
+deux. Ça garde `main` toujours installable — une app qui résout par tag ne voit jamais un
+état intermédiaire.
+
+```bash
+git checkout main && git merge --ff-only develop
+git tag -a 1.1.0 -m "…"
+git push origin main develop --tags
+git checkout develop
+```
+
+Le dépôt wiki, lui, n'a qu'une branche et elle s'appelle `master`.
