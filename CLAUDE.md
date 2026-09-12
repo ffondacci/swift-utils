@@ -170,6 +170,30 @@ La surface publique est un engagement. On ne l'élargit pas « au cas où ».
   `@Test("relire une clé absente renvoie la valeur par défaut")`, pas `testLoad()`.
 - Couvrir d'abord : round-trip, clé absente, données corrompues, écritures concurrentes.
 
+### Tester le fonctionnel, pas la mécanique
+
+Un test doit vérifier **ce dont une app dépend**. Le reste gonfle la suite et la rend
+coûteuse à faire évoluer sans rien protéger.
+
+**À tester** — ce qui casserait une app si ça changeait :
+
+- aller-retour d'une valeur, cas d'absence, données illisibles
+- chemins d'erreur : quelle erreur, avec quel contexte
+- garanties : atomicité d'un lot, ordre d'une requête, lectures avant écritures
+- invariants de concurrence : écritures concurrentes, reprise, non-rejeu d'un incrément
+- les contrats partagés, une fois, paramétrés sur toutes les implémentations
+
+**À ne pas tester** :
+
+- la mécanique du langage — qu'un `enum` `Comparable` s'ordonne, qu'une `struct` a une
+  sémantique de valeur, qu'un littéral compile
+- le détail d'un format de sortie, sauf s'il est lui-même le contrat
+- un accesseur qui ne fait que transmettre
+- une propriété par membre : un comportement, un test
+
+En cas de doute : « si ce test échouait demain, est-ce qu'une app serait cassée ? » Si la
+réponse est non, il ne mérite pas d'exister.
+
 ## Style
 
 - Un type public par fichier, le fichier porte le nom du type.
