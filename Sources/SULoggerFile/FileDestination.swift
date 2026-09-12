@@ -127,7 +127,7 @@ public final class FileDestination: LogDestination {
 
     /// Efface tout le journal et recommence un fichier vide.
     public func reset() throws {
-        try state.withLock { state in
+        state.withLock { state in
             try? state.handle?.close()
             state.handle = nil
             state.size = 0

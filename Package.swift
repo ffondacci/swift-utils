@@ -25,6 +25,24 @@ let commonSwiftSettings: [SwiftSetting] = [
     .strictMemorySafety(),
 ]
 
+/// Les mêmes, **sans** `strictMemorySafety`.
+///
+/// `SUFirestoreLive` n'existe que pour parler au SDK Firebase, écrit en Objective-C. Le
+/// réglage y signale alors **chaque appel** vers lui — une trentaine de lignes qui
+/// n'apprennent rien, puisque l'interop est précisément le métier de cette cible. Le garder
+/// noierait les cas où il dit vraiment quelque chose, dans les cinq autres cibles qui sont
+/// du Swift pur.
+///
+/// Écrit en clair plutôt que dérivé de `commonSwiftSettings` : un `dropLast()` dépendrait
+/// de l'ordre des réglages, et le jour où on en ajoute un, il retirerait le mauvais.
+let interopSwiftSettings: [SwiftSetting] = [
+    .swiftLanguageMode(.v6),
+    .defaultIsolation(nil),
+    .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+    .enableUpcomingFeature("InferIsolatedConformances"),
+    .enableUpcomingFeature("ExistentialAny"),
+]
+
 let package = Package(
     name: "swift-utils",
     platforms: [
@@ -116,7 +134,7 @@ let package = Package(
                     condition: .when(traits: ["Firebase"])
                 ),
             ],
-            swiftSettings: commonSwiftSettings
+            swiftSettings: interopSwiftSettings
         ),
         .testTarget(
             name: "SUPersistenceTests",
