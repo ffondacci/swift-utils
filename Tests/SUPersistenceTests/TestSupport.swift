@@ -12,6 +12,7 @@ enum BackendFixture: String, CaseIterable, Sendable, CustomTestStringConvertible
     case inMemory
     case userDefaults
     case jsonFile
+    case jsonDirectory
 
     var testDescription: String { rawValue }
 }
@@ -38,6 +39,12 @@ func withBackend<T>(
     case .jsonFile:
         let directory = temporaryDirectory()
         let backend = JSONFileBackend(fileURL: directory.appending(path: "store.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        return try await body(backend)
+
+    case .jsonDirectory:
+        let directory = temporaryDirectory()
+        let backend = JSONDirectoryBackend(directory: directory)
         defer { try? FileManager.default.removeItem(at: directory) }
         return try await body(backend)
     }
@@ -84,6 +91,10 @@ struct FailingRepository: PersistenceRepository {
         throw error
     }
 
+    func stored<Value: PersistentValue>(_ key: PersistenceKey<Value>) async throws(PersistenceError) -> StoredValue<Value>? {
+        throw error
+    }
+
     func save<Value: PersistentValue>(_ value: Value, for key: PersistenceKey<Value>) async throws(PersistenceError) {
         throw error
     }
@@ -96,7 +107,45 @@ struct FailingRepository: PersistenceRepository {
         throw error
     }
 
+    func save<Value: PersistentValue>(_ value: Value, id: String, in collection: PersistenceCollection<Value>) async throws(PersistenceError) {
+        throw error
+    }
+
+    func load<Value: PersistentValue>(id: String, from collection: PersistenceCollection<Value>) async throws(PersistenceError) -> Value? {
+        throw error
+    }
+
+    func stored<Value: PersistentValue>(id: String, from collection: PersistenceCollection<Value>) async throws(PersistenceError) -> StoredValue<Value>? {
+        throw error
+    }
+
+    func loadAll<Value: PersistentValue>(from collection: PersistenceCollection<Value>) async throws(PersistenceError) -> [String: Value] {
+        throw error
+    }
+
+    func ids<Value: PersistentValue>(in collection: PersistenceCollection<Value>) async throws(PersistenceError) -> [String] {
+        throw error
+    }
+
+    func remove<Value: PersistentValue>(id: String, from collection: PersistenceCollection<Value>) async throws(PersistenceError) {
+        throw error
+    }
+
+    func removeAll<Value: PersistentValue>(from collection: PersistenceCollection<Value>) async throws(PersistenceError) {
+        throw error
+    }
+
     func removeAll() async throws(PersistenceError) {
         throw error
     }
+}
+
+// MARK: - Collections de test
+
+extension PersistenceCollection where Value == Profile {
+    static let profiles = PersistenceCollection("profiles")
+}
+
+extension PersistenceCollection where Value == Int {
+    static let scores = PersistenceCollection("scores")
 }

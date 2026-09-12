@@ -61,6 +61,10 @@ public actor UserDefaultsBackend: PersistenceBackend {
         defaults.removeObject(forKey: Self.indexKey)
     }
 
+    public func keys(withPrefix prefix: String) throws(PersistenceError) -> [StorageKey] {
+        writtenKeys.filter { $0.hasPrefix(prefix) }.map { StorageKey($0) }
+    }
+
     private var writtenKeys: Set<String> {
         Set(defaults.stringArray(forKey: Self.indexKey) ?? [])
     }

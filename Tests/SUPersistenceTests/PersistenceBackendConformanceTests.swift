@@ -100,6 +100,43 @@ struct PersistenceBackendConformanceTests {
         }
     }
 
+    @Test("l'énumération par préfixe ne rend que les clés concernées", arguments: BackendFixture.allCases)
+    func keysWithPrefix(fixture: BackendFixture) async throws {
+        try await withBackend(fixture) { backend in
+            try await backend.write(Data([1]), for: "collection/profiles/a")
+            try await backend.write(Data([2]), for: "collection/profiles/b")
+            try await backend.write(Data([3]), for: "collection/scores/z")
+            try await backend.write(Data([4]), for: "reglage")
+
+            let profiles = try await backend.keys(withPrefix: "collection/profiles/")
+            let all = try await backend.keys(withPrefix: "")
+
+            #expect(Set(profiles.map(\.rawValue)) == ["collection/profiles/a", "collection/profiles/b"])
+            #expect(all.count == 4)
+        }
+    }
+
+    @Test("un préfixe sans correspondance rend une liste vide", arguments: BackendFixture.allCases)
+    func keysWithUnmatchedPrefix(fixture: BackendFixture) async throws {
+        try await withBackend(fixture) { backend in
+            try await backend.write(Data([1]), for: "a")
+
+            let keys = try await backend.keys(withPrefix: "jamais/")
+            #expect(keys.isEmpty)
+        }
+    }
+
+    @Test("une clé supprimée disparaît de l'énumération", arguments: BackendFixture.allCases)
+    func removedKeyLeavesEnumeration(fixture: BackendFixture) async throws {
+        try await withBackend(fixture) { backend in
+            try await backend.write(Data([1]), for: "x/1")
+            try await backend.remove("x/1")
+
+            let keys = try await backend.keys(withPrefix: "x/")
+            #expect(keys.isEmpty)
+        }
+    }
+
     @Test("cinquante écritures concurrentes aboutissent toutes", arguments: BackendFixture.allCases)
     func concurrentWrites(fixture: BackendFixture) async throws {
         try await withBackend(fixture) { backend in

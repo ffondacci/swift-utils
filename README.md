@@ -110,13 +110,57 @@ son défaut : elle rend `false` tant que la clé n'a pas été chargée, et `fal
 Les marques vivent dans leur propre espace de noms : une marque `onboarding` n'écrase
 jamais une préférence `onboarding`.
 
+### Collections
+
+Une clé désigne une valeur ; une collection en désigne un nombre quelconque, adressées par
+identifiant. C'est ce qu'il faut pour garder localement ce qu'une API a rendu.
+
+```swift
+extension PersistenceCollection where Value == Profile {
+    static let profiles = PersistenceCollection("profiles")
+}
+
+try await store.save(profile, id: profile.id, in: .profiles)
+let un    = try await store.load(id: "u1", from: .profiles)
+let tous  = try await store.loadAll(from: .profiles)
+let actifs = try await store.filter(.profiles) { $0.visits > 10 }
+let ids   = try await store.ids(in: .profiles)        // sans charger les valeurs
+try await store.removeAll(from: .profiles)
+```
+
+Une collection `profiles` et une clé `profiles` ne se croisent jamais. `loadAll` **jette**
+dès qu'une entrée est illisible : après un changement de modèle, on veut le savoir et
+vider, pas récupérer un sous-ensemble amputé en silence.
+
+### Fraîcheur
+
+Toute valeur est horodatée à l'écriture. De quoi décider entre le cache local et un appel
+réseau, sans tenir un registre à côté :
+
+```swift
+if let entry = try await store.stored(.catalog),
+   !entry.isStale(after: .seconds(3600)) {
+    return entry.value
+}
+return try await network.send(FetchCatalog())
+```
+
+```swift
+// ou, plus court
+if try await store.needsRefresh(.catalog, after: .seconds(3600)) { … }
+```
+
+`stored(_:)` distingue aussi « jamais écrit » de « écrit une valeur égale au défaut », ce
+que `load(_:)` ne peut pas faire.
+
 ### Supports disponibles
 
 | Support | Pour quoi |
 |---|---|
 | `.userDefaults` | Petites valeurs de préférence. Le défaut. |
 | `.userDefaultsSuite(named:)` | App group partagé, ou isolation d'un test. |
-| `.jsonFile(named:)` | Valeurs structurées, dans un document JSON d'Application Support. |
+| `.jsonFile(named:)` | Un document JSON unique. Réécrit en entier à chaque écriture : parfait pour des réglages, inadapté à une grosse collection. |
+| `.jsonDirectory(named:)` | Un fichier JSON **par clé**. Le support des collections volumineuses. |
 | `.inMemory` | Previews SwiftUI et tests. Rien n'atteint le disque. |
 
 SwiftData et SQLite viendront s'ajouter comme backends supplémentaires, sans changement

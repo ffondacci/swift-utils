@@ -11,9 +11,9 @@ volontairement — voir les décisions figées.
 
 Modules existants :
 
-- **`SUPersistence`** — sauvegarder et relire des valeurs, via `UserDefaults` ou un
-  fichier `.json` aujourd'hui, via SwiftData / SQLite demain, **sans que l'app appelante
-  change une ligne**.
+- **`SUPersistence`** — sauvegarder et relire des valeurs et des collections, horodatées,
+  via `UserDefaults` ou des fichiers `.json` aujourd'hui, via SwiftData / SQLite demain,
+  **sans que l'app appelante change une ligne**.
 - **`SUNetworking`** — appeler une API HTTP : endpoints typés, chaîne de middlewares
   (en-têtes, jeton, reprise, journal), transport remplaçable.
 

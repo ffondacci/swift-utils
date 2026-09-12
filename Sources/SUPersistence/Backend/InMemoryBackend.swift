@@ -34,4 +34,8 @@ public actor InMemoryBackend: PersistenceBackend {
     public func removeAll() throws(PersistenceError) {
         storage.removeAll()
     }
+
+    public func keys(withPrefix prefix: String) throws(PersistenceError) -> [StorageKey] {
+        storage.keys.filter { $0.rawValue.hasPrefix(prefix) }
+    }
 }

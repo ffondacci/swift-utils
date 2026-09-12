@@ -35,4 +35,12 @@ public protocol PersistenceBackend: Sendable {
 
     /// Vide tout ce que ce backend a écrit — et rien d'autre.
     func removeAll() async throws(PersistenceError)
+
+    /// Les clés écrites qui commencent par `prefix`, dans un ordre indéterminé.
+    ///
+    /// C'est ce qui rend les collections possibles. Les trois backends du module
+    /// suivaient déjà leurs clés pour `removeAll()`, donc la méthode ne leur coûte rien —
+    /// un backend qui ne saurait pas énumérer devrait le faire savoir en rendant un
+    /// tableau vide, jamais en mentant.
+    func keys(withPrefix prefix: String) async throws(PersistenceError) -> [StorageKey]
 }

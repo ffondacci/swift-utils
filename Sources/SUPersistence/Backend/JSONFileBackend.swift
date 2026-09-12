@@ -87,6 +87,12 @@ public actor JSONFileBackend: PersistenceBackend {
         }
     }
 
+    public func keys(withPrefix prefix: String) throws(PersistenceError) -> [StorageKey] {
+        try loadedDocument(for: prefix).keys
+            .filter { $0.hasPrefix(prefix) }
+            .map { StorageKey($0) }
+    }
+
     // MARK: - Disque
 
     /// Le document en mémoire, lu depuis le disque au premier appel.

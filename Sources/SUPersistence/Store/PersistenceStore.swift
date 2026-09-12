@@ -51,7 +51,7 @@ public final class PersistenceStore {
         repository: CodableRepository(backend: UserDefaultsBackend())
     )
 
-    @ObservationIgnored private let repository: any PersistenceRepository
+    @ObservationIgnored let repository: any PersistenceRepository
 
     /// Les valeurs déjà chargées. C'est ce que `@Observable` suit.
     private var cache: [String: any Sendable] = [:]
@@ -106,6 +106,36 @@ public final class PersistenceStore {
         let value = try await repository.load(key)
         cache[key.name] = value
         return value
+    }
+
+    /// La valeur **et sa date d'écriture**, ou `nil` si rien n'a jamais été écrit.
+    ///
+    /// C'est ce qui permet de décider « je garde le local ou je rafraîchis ? » :
+    ///
+    /// ```swift
+    /// if let entry = try await store.stored(.catalog),
+    ///    !entry.isStale(after: .seconds(3600)) {
+    ///     return entry.value
+    /// }
+    /// return try await network.send(FetchCatalog())
+    /// ```
+    public func stored<Value: PersistentValue>(
+        _ key: PersistenceKey<Value>
+    ) async throws(PersistenceError) -> StoredValue<Value>? {
+        let entry = try await repository.stored(key)
+        if let entry { cache[key.name] = entry.value }
+        return entry
+    }
+
+    /// Indique s'il faut rafraîchir : la valeur est absente, ou plus vieille que `maxAge`.
+    ///
+    /// Une clé jamais écrite rend `true` — il n'y a rien de frais à réutiliser.
+    public func needsRefresh<Value: PersistentValue>(
+        _ key: PersistenceKey<Value>,
+        after maxAge: Duration
+    ) async throws(PersistenceError) -> Bool {
+        guard let entry = try await repository.stored(key) else { return true }
+        return entry.isStale(after: maxAge)
     }
 
     /// Indique si une valeur a été écrite sous `key`.
