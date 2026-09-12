@@ -395,6 +395,149 @@ let profile = try await store.send(FetchProfile(userID: "42"))
 
 ---
 
+## SUFirestore
+
+Lire, écrire et interroger Firestore, sans que l'app connaisse le SDK.
+
+> **Le SDK Firebase est derrière un trait.** Sans lui, `firebase-ios-sdk` n'est ni
+> téléchargé ni compilé — 0 octet pour une app qui ne fait que de la persistance. Avec, ce
+> sont 144 Mo et 14 paquets, assumés.
+>
+> Dans Xcode, cocher le trait **Firebase** au moment d'ajouter le paquet. En ligne de
+> commande : `swift build --traits Firebase`.
+
+### Déclarer ses chemins
+
+```swift
+import SUFirestore
+
+extension CollectionPath where Value == Profile {
+    static let profiles = CollectionPath("profiles")
+}
+```
+
+### Monter le store
+
+```swift
+import FirebaseCore
+import SUFirestoreLive
+
+init() {
+    AppCheck.setAppCheckProviderFactory(MyFactory())   // AVANT
+    FirebaseApp.configure()                             // puis
+    firestore = FirestoreStore(
+        client: RetryingFirestore(
+            wrapping: LiveFirestore(configuration: FirestoreConfiguration(
+                offlinePersistence: false      // le cache disque, désactivé par défaut
+            )),
+            policy: .default
+        )
+    )
+}
+```
+
+`SUFirestore` ne configure **jamais** Firebase : `FirebaseApp.configure()` doit être appelé
+exactement une fois, et seule l'app peut le garantir. App Check s'installe avant.
+
+### CRUD
+
+```swift
+let profile = try await store.document("u1", in: .profiles)          // nil si absent
+try await store.setDocument(profile, id: "u1", in: .profiles)        // remplace
+try await store.setDocument(patch, id: "u1", in: .profiles, merge: true)   // fusionne
+try await store.updateDocument(["visits": 5], id: "u1", in: .profiles)     // doit exister
+try await store.deleteDocument(id: "u1", in: .profiles)
+```
+
+### Requêtes
+
+```swift
+let actifs = try await store.documents(in: .profiles) {
+    $0.where("visits", .isGreaterThan, 10)
+      .where("premium", .isEqualTo, true)
+      .order(by: "name")
+      .limit(to: 20)
+}
+```
+
+### Lots atomiques
+
+```swift
+try await store.batch { batch in
+    batch.set(profile, id: "u1", in: .profiles, merge: true)
+    batch.update(["count": 3], id: "global", in: .stats)
+    batch.delete(id: draftID, in: .drafts)
+}
+```
+
+Ou tout passe, ou rien. Au-delà de 500 écritures, le lot est refusé **avant** d'atteindre
+le réseau.
+
+### Reprise sur contention
+
+Deux appareils qui écrivent le même document au même instant : Firestore en abandonne un
+avec `aborted`. `RetryingFirestore` rejoue, et la seconde tentative trouve la voie libre.
+
+| Rejoué | Jamais rejoué |
+|---|---|
+| `aborted` (contention) | `permissionDenied` |
+| `unavailable` (réseau) | `notFound`, `alreadyExists` |
+| `resourceExhausted` (quota) | `decodingFailed` |
+| `deadlineExceeded` | `failedPrecondition` |
+
+Backoff exponentiel avec jitter — sans l'aléa, les deux écritures qui se sont percutées
+reviendraient exactement ensemble.
+
+> Les écritures Firestore sont **absolues** (`set`, `update`, `delete` décrivent un état
+> final), donc les rejouer aboutit au même document. C'est ce qui autorise la reprise sur
+> les écritures ici, là où `SUNetworking` épargne les `POST`.
+
+### Opérations serveur, pagination, provenance
+
+```swift
+try await store.updateDocument(["visits": .increment(1)], id: "u1", in: .profiles)
+try await store.updateDocument(["tags": .arrayUnion(["beta"])], id: "u1", in: .profiles)
+
+let page = try await store.documents(in: .profiles) {
+    $0.order(by: "name").start(after: [cursor]).limit(to: 50)
+}
+
+if let snapshot = try await store.snapshot("u1", in: .profiles),
+   snapshot.metadata.isFromCache {
+    banner = "Hors ligne"
+}
+```
+
+`increment` est la **seule** opération relative du module, et une écriture qui en contient
+une n'est jamais rejouée — la rejouer après un timeout douteux compterait deux fois.
+
+### Erreurs
+
+`FirestoreError` nomme les codes plutôt que de les compter : `permissionDenied`,
+`notFound`, `unavailable`, `unauthenticated`, `aborted`, `failedPrecondition`… Et
+`failedPrecondition` **extrait l'URL de création de l'index** que Firestore glisse dans
+son message.
+
+```swift
+catch let error where error.requiresReauthentication { showLogin() }
+catch let error where error.isRetryable { showOfflineBanner() }
+```
+
+### Tester
+
+`InMemoryFirestore` honore le même contrat — écritures, requêtes, lots, atomicité — sans
+projet Firebase, sans réseau, et **sans le SDK dans le graphe de dépendances** :
+
+```swift
+let store = FirestoreStore.inMemory()
+try await store.setDocument(profile, id: "u1", in: .profiles)
+```
+
+Il ne rejoue ni les règles de sécurité, ni les index composites : il teste **votre** code,
+pas Firestore.
+
+---
+
 ## Développement
 
 Ouvrir le package seul, pour le travailler et lancer ses tests :

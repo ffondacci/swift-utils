@@ -27,13 +27,15 @@ au code de l'app, l'architecture est ratée.
 | Sujet | Décision | Pourquoi |
 |---|---|---|
 | Plateformes | iOS 18 / macOS 15 / watchOS 11 / tvOS 18 / visionOS 2 | C'est le palier qui débloque `Mutex`, `@Observable` + `.environment()`, SwiftData et les typed throws, sans fermer la porte aux apps en production. |
-| Toolchain | `// swift-tools-version: 6.0`, langage Swift 6 | Swift 6 impose la stricte concurrence par défaut. On reste en 6.0 (et non 6.2+) pour ne pas exiger le dernier Xcode chez le consommateur. |
+| Toolchain | `// swift-tools-version: 6.2`, langage Swift 6 | Le mode langage 6 est le plus récent qui existe — il n'y a pas de mode 6.1 ou 6.2. C'est le **tools-version** qui donne accès aux évolutions récentes, et 6.2 débloque les traits SPM et la concurrence « approachable ». Le coût est d'exiger Xcode 26 chez le consommateur ; les seuls consommateurs sont les apps de Florent, qui y sont déjà. |
+| Concurrence | `defaultIsolation(nil)`, `NonisolatedNonsendingByDefault`, `InferIsolatedConformances`, `ExistentialAny`, `strictMemorySafety` | Voir `commonSwiftSettings` dans `Package.swift` : chaque réglage change la sémantique, aucun n'est décoratif. |
+| Dépendances lourdes | Derrière un **trait SPM** | `firebase-ios-sdk` pèse 144 Mo et 14 paquets. Sans le trait `Firebase`, SwiftPM ne le télécharge même pas : une app qui ne veut que `SUPersistence` paie 0 octet. |
 | Découpage | 1 utilitaire = 1 module = 1 produit `.library` | La frontière de module fait respecter la separation of concerns **par le compilateur**, pas par la discipline. |
 | Nommage | Préfixe `SU` sur les **modules seulement** | Un nom de module est global chez le consommateur. Les types, eux, sont déjà namespacés par leur module : `import SUPersistence` puis `PersistenceStore`, pas `SUPersistenceStore`. |
 | Point d'entrée | 1 store **par module** | Une app qui n'importe que `SUPersistence` ne traîne pas le reste. Pas de module chapeau qui dépendrait de tous les autres. |
 | Singleton | Seulement quand un défaut a du sens | `PersistenceStore.shared` s'adosse à `UserDefaults.standard`, ce qui est un choix défendable sans rien savoir de l'app. `NetworkStore` n'a pas de `shared` : il lui faut les URL de base des services, que seule l'app connaît, et un singleton sans environnement ne pourrait que planter ou mentir. |
 | Tests | Swift Testing | `async` natif, tests paramétrés, traits de parallélisme — aligné avec du code concurrency-first. |
-| Dépendances | Aucune, hors SDK Apple | Une brique qui traîne un arbre de dépendances n'est pas une brique. |
+| Dépendances | Aucune par défaut | Une brique qui traîne un arbre de dépendances n'est pas une brique. Ce qui en exige une vit derrière un trait, et ne coûte rien à qui ne l'active pas. |
 
 ## Le principe directeur : separation of concerns
 
@@ -121,6 +123,18 @@ qui n'a pas encore eu lieu.
   quel. Une erreur qu'on ne peut pas diagnostiquer sans debugger est une erreur ratée.
 - Les erreurs des couches basses sont **traduites** en remontant, pas propagées telles
   quelles : le store ne doit jamais laisser fuir un `CocoaError` de `FileManager`.
+
+## Nommage — deux collisions à éviter
+
+**Jamais de membre statique nommé `none`.** En position optionnelle, `.none` désigne
+`Optional.none` et le compilateur le choisit **en silence** : une politique qu'on croit
+désactivée redevient celle par défaut, sans erreur ni warning. Utiliser `disabled`, `off`,
+ou un nom du domaine.
+
+**Vérifier les noms contre les SDK que l'app importera.** `FirestoreQuery` et `WriteBatch`
+existent déjà dans `FirebaseFirestore` : une app important les deux modules aurait eu une
+ambiguïté à chaque usage. D'où `DocumentQuery` et `DocumentBatch`. Le réflexe avant de
+nommer un type public : `grep` dans le SDK concerné.
 
 ## Visibilité
 

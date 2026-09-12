@@ -21,7 +21,7 @@ import Foundation
 ///         payload: feedback,
 ///         headers: ["X-Debug": "1"],
 ///         authentication: .optional,
-///         policy: RequestPolicy(timeout: .seconds(5), retry: .none)
+///         policy: RequestPolicy(timeout: .seconds(5), retry: .disabled)
 ///     )
 /// )
 /// ```

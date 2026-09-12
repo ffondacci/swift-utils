@@ -55,7 +55,10 @@ public struct RetryPolicy: Sendable, Equatable {
     public static let `default` = RetryPolicy()
 
     /// Une seule tentative, jamais de reprise.
-    public static let none = RetryPolicy(maxRetries: 0)
+    ///
+    /// > Le nom évite `none` : en position optionnelle, `.none` désigne `Optional.none` et
+    /// > le compilateur le choisit **en silence**.
+    public static let disabled = RetryPolicy(maxRetries: 0)
 }
 
 /// L'attente entre deux tentatives.

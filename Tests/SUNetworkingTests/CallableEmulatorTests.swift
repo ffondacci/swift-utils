@@ -31,7 +31,7 @@ struct CallableEmulatorTests {
             environment: APIEnvironment([
                 .cloudFunctions: URL(string: "http://127.0.0.1:5001/demo-swift-utils/us-central1")!
             ]),
-            defaultPolicy: RequestPolicy(timeout: .seconds(10), retry: .none)
+            defaultPolicy: RequestPolicy(timeout: .seconds(10), retry: .disabled)
         )
     }
 

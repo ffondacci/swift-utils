@@ -199,7 +199,7 @@ func greetingJSON(_ message: String = "bonjour") -> String {
 func makeClient(
     _ outcomes: [MockTransport.Outcome] = [.status(200, json: greetingJSON())],
     middlewares: [any Middleware] = [],
-    policy: RequestPolicy = RequestPolicy(retry: .none)
+    policy: RequestPolicy = RequestPolicy(retry: .disabled)
 ) -> (client: PipelineClient, transport: MockTransport) {
     let transport = MockTransport(outcomes)
     let client = PipelineClient(

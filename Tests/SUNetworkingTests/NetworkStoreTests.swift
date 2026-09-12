@@ -13,7 +13,7 @@ struct NetworkStoreTests {
         NetworkStore(
             environment: testEnvironment,
             transport: MockTransport(outcomes),
-            defaultPolicy: RequestPolicy(retry: .none)
+            defaultPolicy: RequestPolicy(retry: .disabled)
         )
     }
 
