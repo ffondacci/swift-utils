@@ -61,11 +61,60 @@ public extension CallableEndpoint {
     }
 
     func decode(_ data: Data) throws -> Response {
+        // Une fonction qui ne rend rien répond `{"result": null}`, que le décodage d'un
+        // type concret refuserait. Le court-circuit est ici plutôt que dans une extension
+        // `where Response == NoResult` : une telle extension n'est retenue comme témoin
+        // que pour un type concret, pas pour `Callable`, ce qui donnerait deux
+        // comportements au même type.
+        if let nothing = NoResult() as? Response { return nothing }
+
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try decoder.decode(CallableResponse<Response>.self, from: data).result
     }
+
+    /// Traduit l'enveloppe d'erreur du format `onCall`.
+    ///
+    /// Une fonction qui lève une `HttpsError` répond hors 2xx — 403 pour
+    /// `permission-denied`, 401 pour `unauthenticated` — avec
+    /// `{"error":{"message":…,"status":…}}`. Le message et le code remontent donc typés
+    /// dans ``NetworkError/serviceFailed(context:code:message:)``, au lieu d'un corps JSON
+    /// que chaque appelant devrait parser.
+    ///
+    /// Un corps qui n'a pas cette forme rend `nil` : le client produit alors son erreur
+    /// générique, sans rien masquer.
+    func mapError(_ data: Data, statusCode: Int) -> NetworkError? {
+        guard let envelope = try? JSONDecoder().decode(CallableFailure.self, from: data) else {
+            return nil
+        }
+        return .serviceFailed(
+            context: NetworkErrorContext(
+                method: method.rawValue,
+                url: path,
+                statusCode: statusCode,
+                responseBody: String(data: data, encoding: .utf8)
+            ),
+            code: envelope.error.status,
+            message: envelope.error.message
+        )
+    }
 }
+
+/// Pour une fonction qui ne rend rien.
+///
+/// Le format `onCall` répond alors `{"result": null}`, que le décodage d'un type concret
+/// refuserait. Ce type absorbe le cas :
+///
+/// ```swift
+/// let _: NoResult = try await network.send(Callable("markAsRead", payload: id))
+/// ```
+///
+/// Le corps de la réponse n'est jamais lu : `{"result": null}`, un objet, ou rien du tout
+/// conviennent tous.
+public struct NoResult: Decodable, Sendable {
+    public init() {}
+}
+
 
 /// Pour une fonction qui ne prend pas d'argument.
 public struct NoPayload: Encodable, Sendable {
@@ -80,4 +129,12 @@ struct CallableRequest<Payload: Encodable & Sendable>: Encodable, Sendable {
 
 struct CallableResponse<Result: Decodable>: Decodable {
     let result: Result
+}
+
+struct CallableFailure: Decodable {
+    struct Failure: Decodable {
+        let message: String
+        let status: String
+    }
+    let error: Failure
 }

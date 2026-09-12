@@ -64,6 +64,15 @@ public enum NetworkError: Error, Sendable, Equatable {
     /// Le serveur a répondu hors de la plage 2xx.
     case httpFailed(context: NetworkErrorContext)
 
+    /// Le serveur a refusé la requête **en donnant lui-même la raison**, dans le format
+    /// d'erreur de son API.
+    ///
+    /// C'est ce qu'un endpoint produit quand il sait lire l'enveloppe d'erreur de son
+    /// service — une Cloud Function `onCall` rend
+    /// `{"error":{"message":…,"status":"PERMISSION_DENIED"}}`. Le message et le code
+    /// arrivent alors typés, au lieu d'un corps JSON à parser à la main.
+    case serviceFailed(context: NetworkErrorContext, code: String, message: String)
+
     /// La réponse est arrivée mais ne correspond pas au type attendu.
     case decodingFailed(context: NetworkErrorContext, reason: String)
 
@@ -89,6 +98,8 @@ public enum NetworkError: Error, Sendable, Equatable {
              let .decodingFailed(context, _),
              let .unauthorized(context):
             context.statusCode
+        case let .serviceFailed(context, _, _):
+            context.statusCode
         case .invalidURL, .encodingFailed, .tokenUnavailable, .cancelled:
             nil
         }
@@ -102,6 +113,8 @@ public enum NetworkError: Error, Sendable, Equatable {
              let .decodingFailed(context, _),
              let .unauthorized(context):
             context
+        case let .serviceFailed(context, _, _):
+            context
         case .invalidURL, .encodingFailed, .tokenUnavailable, .cancelled:
             nil
         }
@@ -114,6 +127,10 @@ public enum NetworkError: Error, Sendable, Equatable {
         case .transportFailed:
             true
         case let .httpFailed(context):
+            context.statusCode.map { $0 == 429 || (500..<600).contains($0) } ?? false
+        case let .serviceFailed(context, _, _):
+            // Le serveur a nommé la raison : c'est une décision, pas un incident.
+            // Seul un 429 ou un 5xx mérite d'être rejoué.
             context.statusCode.map { $0 == 429 || (500..<600).contains($0) } ?? false
         case .invalidURL, .decodingFailed, .encodingFailed, .tokenUnavailable, .unauthorized, .cancelled:
             false
@@ -130,6 +147,8 @@ extension NetworkError: CustomStringConvertible {
             "Requête non aboutie — \(reason) · \(context)"
         case let .httpFailed(context):
             "Le serveur a refusé la requête · \(context)"
+        case let .serviceFailed(context, code, message):
+            "\(code) — \(message) · \(context)"
         case let .decodingFailed(context, reason):
             "Réponse illisible — \(reason) · \(context)"
         case let .encodingFailed(reason):

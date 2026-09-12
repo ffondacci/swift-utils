@@ -335,6 +335,27 @@ fait perdre aucun autre.
 
 `.cloudFunctions` n'est **qu'un nom** : l'URL reste dans votre `APIEnvironment`.
 
+Une fonction qui ne rend rien répond `{"result": null}`. `NoResult` absorbe le cas :
+
+```swift
+let _: NoResult = try await network.send(Callable("markAsRead", payload: id))
+```
+
+Et une `HttpsError` remonte **typée**, pas en JSON à parser :
+
+```swift
+catch NetworkError.serviceFailed(_, let code, let message) {
+    // code == "PERMISSION_DENIED", message == "pas le droit"
+}
+```
+
+C'est le point d'accroche `Endpoint.mapError(_:statusCode:)`, disponible pour n'importe
+quelle API qui décrit ses échecs. Son défaut rend `nil`, et le client produit alors son
+erreur générique — un corps d'une forme inattendue n'est jamais réinterprété de force.
+
+> Ces formats ne sont pas devinés : ils sont vérifiés contre un émulateur Firebase réel.
+> Voir `Tests/Fixtures/emulator/`.
+
 ### Firebase sans le SDK Firebase
 
 `TokenMiddleware` ne connaît pas Firebase. Il demande un jeton à un `TokenProvider`, que

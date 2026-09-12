@@ -42,6 +42,24 @@ public protocol Endpoint<Response>: Sendable {
 
     /// Transforme les octets de la réponse en `Response`.
     func decode(_ data: Data) throws -> Response
+
+    /// Traduit une réponse hors 2xx en erreur, quand le service a son propre format
+    /// d'erreur.
+    ///
+    /// Le défaut rend `nil`, et le client produit alors une
+    /// ``NetworkError/httpFailed(context:)`` qui porte le corps brut. Redéfinissez-la
+    /// quand votre API décrit ses échecs — le message et le code remontent typés au lieu
+    /// d'un JSON à parser dans chaque appelant.
+    ///
+    /// ```swift
+    /// func mapError(_ data: Data, statusCode: Int) -> NetworkError? {
+    ///     guard let failure = try? JSONDecoder().decode(APIFailure.self, from: data) else {
+    ///         return nil   // format inattendu : on laisse le défaut faire
+    ///     }
+    ///     return .serviceFailed(context: …, code: failure.code, message: failure.message)
+    /// }
+    /// ```
+    func mapError(_ data: Data, statusCode: Int) -> NetworkError?
 }
 
 public extension Endpoint {
@@ -51,6 +69,7 @@ public extension Endpoint {
     var body: RequestBody? { nil }
     var authentication: AuthRequirement { .none }
     var policy: RequestPolicy? { nil }
+    func mapError(_ data: Data, statusCode: Int) -> NetworkError? { nil }
 }
 
 public extension Endpoint where Response: Decodable {

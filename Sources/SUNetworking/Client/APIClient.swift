@@ -69,6 +69,11 @@ public final class PipelineClient: APIClient {
         let response = try await execute(context)
 
         guard response.isSuccess else {
+            // L'endpoint a le dernier mot : lui seul connaît le format d'erreur de son
+            // service. À défaut, l'erreur générique porte le corps brut.
+            if let mapped = endpoint.mapError(response.data, statusCode: response.statusCode) {
+                throw mapped
+            }
             throw response.statusCode == 401
                 ? .unauthorized(context: errorContext(request, response))
                 : .httpFailed(context: errorContext(request, response))

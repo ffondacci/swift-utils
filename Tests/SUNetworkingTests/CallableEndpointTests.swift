@@ -78,6 +78,91 @@ struct CallableEndpointTests {
         #expect(headers?["Authorization"] == "Bearer jeton")
     }
 
+    // MARK: - Enveloppe d'erreur
+
+    @Test("une HttpsError remonte son code et son message")
+    func errorEnvelopeIsDecoded() async throws {
+        let (client, _) = makeClient([
+            .status(403, json: #"{"error":{"message":"pas le droit","status":"PERMISSION_DENIED"}}"#)
+        ])
+
+        let error = await #expect(throws: NetworkError.self) {
+            try await client.send(SendFeedback(payload: Feedback(message: "x", rating: 1)))
+        }
+
+        guard case let .serviceFailed(context, code, message) = error else {
+            Issue.record("attendu .serviceFailed, reçu \(String(describing: error))")
+            return
+        }
+        #expect(code == "PERMISSION_DENIED")
+        #expect(message == "pas le droit")
+        #expect(context.statusCode == 403)
+    }
+
+    @Test("un corps d'erreur d'une autre forme retombe sur l'erreur générique")
+    func unknownErrorShapeFallsBack() async throws {
+        let (client, _) = makeClient([.status(500, json: #"{"oups":"autre chose"}"#)])
+
+        let error = await #expect(throws: NetworkError.self) {
+            try await client.send(SendFeedback(payload: Feedback(message: "x", rating: 1)))
+        }
+
+        // `mapError` rend nil plutôt que d'inventer : le client produit son erreur
+        // générique, qui porte le corps brut.
+        guard case .httpFailed = error else {
+            Issue.record("attendu .httpFailed, reçu \(String(describing: error))")
+            return
+        }
+        #expect(error?.statusCode == 500)
+    }
+
+    @Test("un endpoint ordinaire ne traduit rien par défaut")
+    func plainEndpointDoesNotMapErrors() async throws {
+        let (client, _) = makeClient([
+            .status(403, json: #"{"error":{"message":"m","status":"S"}}"#)
+        ])
+
+        let error = await #expect(throws: NetworkError.self) {
+            try await client.send(GetGreeting())
+        }
+
+        guard case .httpFailed = error else {
+            Issue.record("attendu .httpFailed, reçu \(String(describing: error))")
+            return
+        }
+    }
+
+    @Test("une erreur nommée par le serveur n'est pas rejouée, sauf 429 ou 5xx")
+    func serviceErrorsAreNotBlindlyRetried() {
+        let denied = NetworkError.serviceFailed(
+            context: .init(method: "POST", url: "u", statusCode: 403),
+            code: "PERMISSION_DENIED", message: "m"
+        )
+        let overloaded = NetworkError.serviceFailed(
+            context: .init(method: "POST", url: "u", statusCode: 503),
+            code: "UNAVAILABLE", message: "m"
+        )
+
+        #expect(denied.isRetryable == false)
+        #expect(overloaded.isRetryable == true)
+    }
+
+    // MARK: - Absence de résultat
+
+    @Test("une fonction qui ne rend rien accepte result null")
+    func noResultAcceptsNull() async throws {
+        let (client, _) = makeClient([.status(200, json: #"{"result":null}"#)])
+
+        let _: NoResult = try await client.send(Callable("markAsRead", payload: "id-42"))
+    }
+
+    @Test("NoResult ignore aussi un corps vide")
+    func noResultIgnoresEmptyBody() async throws {
+        let (client, _) = makeClient([.status(200, json: "")])
+
+        let _: NoResult = try await client.send(Callable("markAsRead"))
+    }
+
     // MARK: - Forme réglable au point d'appel
 
     @Test("la forme courte marche sans déclarer de type")

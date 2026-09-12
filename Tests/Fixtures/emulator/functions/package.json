@@ -1,0 +1,11 @@
+{
+  "name": "su-networking-emulator-fixture",
+  "description": "Fonctions jetables pour vérifier le format onCall. Jamais déployées.",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "engines": { "node": "22" },
+  "dependencies": {
+    "firebase-functions": "^6.1.0"
+  }
+}

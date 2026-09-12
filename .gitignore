@@ -60,3 +60,9 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# Banc d'essai émulateur Firebase (Tests/Fixtures/emulator)
+Tests/Fixtures/emulator/functions/node_modules/
+Tests/Fixtures/emulator/functions/package-lock.json
+Tests/Fixtures/emulator/**/*-debug.log
+Tests/Fixtures/emulator/.firebase/

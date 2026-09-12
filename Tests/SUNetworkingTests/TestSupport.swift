@@ -3,6 +3,10 @@ import Synchronization
 import Testing
 @testable import SUNetworking
 
+/// Les tests qui exigent l'émulateur Firebase ne tournent que si on le demande, pour que
+/// `swift test` reste vert sans lui.
+let emulatorIsRequested = ProcessInfo.processInfo.environment["SU_EMULATOR"] == "1"
+
 // MARK: - Environnement
 
 extension APIService {
