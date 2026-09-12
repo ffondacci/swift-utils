@@ -23,9 +23,17 @@ import SUFirestore
 /// ```
 public struct LiveFirestore: FirestoreClient {
 
-    // `Firestore` n'est pas annoté `Sendable` — le SDK compile en mode Swift 5 — mais
-    // Firebase le documente explicitement comme utilisable depuis n'importe quel thread.
-    // L'annotation est donc une promesse que le SDK tient, pas une que nous faisons.
+    // `Firestore` n'est pas annoté `Sendable` : le SDK compile en mode Swift 5, donc
+    // aucun de ses types ne l'est, sûr ou non.
+    //
+    // L'invariant qui rend l'annotation acceptable est vérifiable dans ses sources :
+    // `FIRFirestore.mm` route tout son travail par une `AsyncQueue` interne (`workerQueue`)
+    // et les transactions par une `transactionDispatchQueue` dédiée. La sérialisation est
+    // donc faite par le SDK, pas promise par nous. L'instance elle-même est immuable et ne
+    // sert qu'à dériver des références.
+    //
+    // À réévaluer le jour où Firebase annotera ses types : l'annotation devra disparaître.
+    //
     // Garder ce type en `struct` nonisolated plutôt qu'en acteur évite en prime que les
     // snapshots du SDK aient à franchir une frontière d'isolation.
     nonisolated(unsafe) private let database: Firestore
@@ -80,6 +88,7 @@ public struct LiveFirestore: FirestoreClient {
         }
     }
 
+    @concurrent
     public func documents<Value: FirestoreValue>(
         _ type: Value.Type,
         in path: String,
@@ -150,6 +159,7 @@ public struct LiveFirestore: FirestoreClient {
         }
     }
 
+    @concurrent
     public func commit(_ operations: [DocumentWrite]) async throws(FirestoreError) {
         let batch = database.batch()
 

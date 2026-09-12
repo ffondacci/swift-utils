@@ -38,6 +38,7 @@ public struct RetryingFirestore: FirestoreClient {
         }
     }
 
+    @concurrent
     public func documents<Value: FirestoreValue>(
         _ type: Value.Type,
         in path: String,
@@ -81,6 +82,7 @@ public struct RetryingFirestore: FirestoreClient {
         }
     }
 
+    @concurrent
     public func commit(_ operations: [DocumentWrite]) async throws(FirestoreError) {
         // Un seul incrément dans le lot suffit à le rendre non rejouable.
         guard operations.allSatisfy(\.isIdempotent) else {

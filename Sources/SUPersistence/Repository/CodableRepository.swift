@@ -76,6 +76,7 @@ public struct CodableRepository: PersistenceRepository {
         try await read(collection.storageKey(for: id), named: "\(collection.name)/\(id)")
     }
 
+    @concurrent
     public func loadAll<Value: PersistentValue>(
         from collection: PersistenceCollection<Value>
     ) async throws(PersistenceError) -> [String: Value] {

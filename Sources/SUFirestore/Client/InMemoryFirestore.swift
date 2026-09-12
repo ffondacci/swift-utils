@@ -67,6 +67,9 @@ public actor InMemoryFirestore: FirestoreClient {
         )
     }
 
+    // Pas de `@concurrent` ici : les méthodes d'un acteur tournent déjà sur son propre
+    // executor, jamais sur le main actor. L'annotation ne s'applique qu'aux
+    // implémentations nonisolated.
     public func documents<Value: FirestoreValue>(
         _ type: Value.Type,
         in path: String,

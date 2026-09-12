@@ -56,6 +56,14 @@ public protocol PersistenceRepository: Sendable {
     /// - Throws: ``PersistenceError/decodingFailed(key:type:reason:)`` dès qu'**une** entrée
     ///   est illisible. C'est volontaire : après un changement de modèle, on veut le savoir
     ///   et vider la collection, pas récupérer un sous-ensemble silencieusement amputé.
+
+    /// > `@concurrent` : ce travail part sur l'executor global au lieu d'hériter de
+    /// > l'isolation de l'appelant. Sans ça, `NonisolatedNonsendingByDefault` le ferait
+    /// > tourner sur le main actor quand un store `@MainActor` l'appelle — mesuré, pas
+    /// > supposé. Le volume ici est arbitraire, donc le saut d'executor est rentable.
+    /// > Les opérations sur une valeur unique, elles, restent héritées : le saut y
+    /// > coûterait plus cher que le travail.
+    @concurrent
     func loadAll<Value: PersistentValue>(
         from collection: PersistenceCollection<Value>
     ) async throws(PersistenceError) -> [String: Value]

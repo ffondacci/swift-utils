@@ -1,7 +1,7 @@
 import Foundation
 
 /// Une écriture à appliquer dans un lot.
-public enum DocumentWrite: @unchecked Sendable {
+public enum DocumentWrite: Sendable {
     // `any FirestoreValue` est `Sendable` par contrainte, mais le compilateur ne peut pas
     // le prouver à travers l'existentiel. La valeur est immuable et n'est lue qu'une fois,
     // au moment de la validation du lot.

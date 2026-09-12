@@ -8,6 +8,14 @@ import Synchronization
 public protocol APIClient: Sendable {
 
     /// Exécute l'endpoint et décode sa réponse.
+    ///
+    /// > `@concurrent` : ce travail part sur l'executor global au lieu d'hériter de
+    /// > l'isolation de l'appelant. Sans ça, `NonisolatedNonsendingByDefault` le ferait
+    /// > tourner sur le main actor quand un store `@MainActor` l'appelle — mesuré, pas
+    /// > supposé. Le volume ici est arbitraire, donc le saut d'executor est rentable.
+    /// > Les opérations sur une valeur unique, elles, restent héritées : le saut y
+    /// > coûterait plus cher que le travail.
+    @concurrent
     func send<E: Endpoint>(_ endpoint: E) async throws(NetworkError) -> E.Response
 
     /// Annule les requêtes en cours d'un service.
@@ -56,6 +64,7 @@ public final class PipelineClient: APIClient {
 
     // MARK: - Envoi
 
+    @concurrent
     public func send<E: Endpoint>(_ endpoint: E) async throws(NetworkError) -> E.Response {
         let policy = endpoint.policy ?? defaultPolicy
         let request = try buildRequest(for: endpoint, policy: policy)

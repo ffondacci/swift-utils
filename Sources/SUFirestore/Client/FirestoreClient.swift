@@ -39,6 +39,14 @@ public protocol FirestoreClient: Sendable {
     func deleteDocument(at path: String) async throws(FirestoreError)
 
     /// Les documents d'une collection qui satisfont la requête, dans l'ordre demandé.
+    ///
+    /// > `@concurrent` : ce travail part sur l'executor global au lieu d'hériter de
+    /// > l'isolation de l'appelant. Sans ça, `NonisolatedNonsendingByDefault` le ferait
+    /// > tourner sur le main actor quand un store `@MainActor` l'appelle — mesuré, pas
+    /// > supposé. Le volume ici est arbitraire, donc le saut d'executor est rentable.
+    /// > Les opérations sur une valeur unique, elles, restent héritées : le saut y
+    /// > coûterait plus cher que le travail.
+    @concurrent
     func documents<Value: FirestoreValue>(
         _ type: Value.Type,
         in path: String,
@@ -47,6 +55,9 @@ public protocol FirestoreClient: Sendable {
     ) async throws(FirestoreError) -> FirestoreQueryResult<Value>
 
     /// Applique un lot d'écritures de façon atomique.
+    ///
+    /// `@concurrent` : un lot peut porter jusqu'à 500 encodages.
+    @concurrent
     func commit(_ operations: [DocumentWrite]) async throws(FirestoreError)
 
     /// Exécute une transaction : lire, décider, écrire, sans qu'un autre client
