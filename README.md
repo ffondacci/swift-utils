@@ -75,6 +75,41 @@ try await store.remove(.onboardingDone)
 try await store.removeAll()
 ```
 
+### « Est-ce la première fois ? »
+
+Le besoin revient dans presque toutes les apps : ne montrer un onboarding qu'une fois,
+n'expliquer une permission qu'au premier refus, ne signaler une nouveauté qu'une fois par
+mise à jour. Le store a un vocabulaire dédié pour ça.
+
+```swift
+extension SeenKey {
+    static let onboarding: SeenKey = "onboarding"
+    static let cameraExplainer: SeenKey = "cameraExplainer"
+}
+```
+
+```swift
+// Marque la chose comme vue, et dit si c'était la première fois.
+.task {
+    showOnboarding = try await store.markAsSeen(.onboarding)
+}
+
+// Ou séparément
+let seen = try await store.hasBeenSeen(.onboarding)
+try await store.setHasBeenSeen(false, for: .onboarding)   // « revoir l'introduction »
+```
+
+`markAsSeen(_:)` est la forme à préférer quand la lecture ne sert qu'à décider d'un
+affichage : deux appels concurrents sur la même clé ne rendent `true` qu'une seule fois,
+là où un `hasBeenSeen` suivi d'un `setHasBeenSeen` laisserait passer un double affichage.
+
+`hasBeenSeenCached(_:)` existe aussi, synchrone et observée pour les `body`. Attention à
+son défaut : elle rend `false` tant que la clé n'a pas été chargée, et `false` veut dire
+« jamais vue ». Ne l'utilisez pas seule pour décider d'un premier affichage.
+
+Les marques vivent dans leur propre espace de noms : une marque `onboarding` n'écrase
+jamais une préférence `onboarding`.
+
 ### Supports disponibles
 
 | Support | Pour quoi |

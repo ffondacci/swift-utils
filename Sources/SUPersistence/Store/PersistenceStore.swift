@@ -56,6 +56,11 @@ public final class PersistenceStore {
     /// Les valeurs déjà chargées. C'est ce que `@Observable` suit.
     private var cache: [String: any Sendable] = [:]
 
+    /// Les marques « déjà vu » dont le marquage est en cours, pour que deux appels
+    /// concurrents à `markAsSeen(_:)` ne se déclarent pas tous deux « première fois ».
+    /// Voir `PersistenceStore+Seen.swift`.
+    @ObservationIgnored var seenMarkingInFlight: Set<String> = []
+
     /// Construit un store sur un repository quelconque — y compris un double de test ou
     /// un backend maison.
     public init(repository: any PersistenceRepository) {
