@@ -572,6 +572,77 @@ Aucun projet Firebase n'existe derrière — `demo-` est reconnu comme factice.
 
 ---
 
+## SUAuth
+
+Connexion, état de session, jetons, gestion de compte. L'adaptateur `FirebaseAuth` vit dans
+`SUAuthLive`, derrière le trait **Firebase**.
+
+### Trois états, pas deux
+
+```swift
+switch auth.state {
+case .unknown:         ProgressView()      // la session se restaure
+case .signedOut:       SignInScreen()
+case .signedIn(let u): HomeScreen(user: u)
+}
+```
+
+**C'est le piège numéro un.** Confondre `unknown` avec `signedOut` fait clignoter un écran
+de connexion devant quelqu'un qui était déjà connecté. Le store s'abonne tout seul au flux
+d'état à sa construction.
+
+### Se connecter
+
+```swift
+try await auth.signUp(email: email, password: password)
+try await auth.signIn(email: email, password: password)
+try await auth.signInAnonymously()
+try await auth.signOut()
+
+// Fournisseurs tiers : aucun SDK de connexion dans le module
+try await auth.signIn(with: ProviderCredential(provider: .apple, idToken: token, rawNonce: nonce))
+```
+
+### Lier un compte anonyme sans perdre ses données
+
+```swift
+let anonyme = try await auth.signInAnonymously()
+let lié = try await auth.link(ProviderCredential(provider: .apple, idToken: token))
+lié.id == anonyme.id        // vrai — tout ce qui est rattaché à cet id survit
+```
+
+### Les opérations sensibles
+
+```swift
+do {
+    try await auth.updatePassword(nouveau)
+} catch let error where error.requiresReauthentication {
+    try await auth.reauthenticate(password: ancien)
+    try await auth.updatePassword(nouveau)
+}
+```
+
+### Le pont vers SUNetworking
+
+```swift
+struct FirebaseTokens: TokenProvider {
+    let auth: AuthStore
+    func token(forceRefresh: Bool) async throws -> String? {
+        try await auth.idToken(forceRefresh: forceRefresh)
+    }
+}
+```
+
+### Trois propriétés d'erreur, trois réactions
+
+| | Ce que l'app fait |
+|---|---|
+| `isUserCorrectable` | afficher le message **sous le champ** concerné |
+| `requiresReauthentication` | demander le mot de passe, puis rejouer |
+| `isRetryable` | proposer de réessayer |
+
+---
+
 ## SUStorage
 
 Téléverser, télécharger et lister des fichiers. L'adaptateur Firebase Storage vit dans

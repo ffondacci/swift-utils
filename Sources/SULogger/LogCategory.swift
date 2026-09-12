@@ -17,6 +17,12 @@ public enum LogCategory: String, Sendable, Hashable, CaseIterable {
     /// Lectures et écritures **locales**, caches, migrations.
     case persistence
 
+    /// Authentification : connexion, déconnexion, jetons, changements d'état.
+    ///
+    /// Séparée du reste parce que c'est la première chose qu'on relit quand un utilisateur
+    /// dit « ça m'a déconnecté tout seul ».
+    case auth
+
     /// Fichiers : téléversements, téléchargements, métadonnées.
     ///
     /// Séparée de ``network`` : un transfert de vingt méga-octets et un appel d'API n'ont

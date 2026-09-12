@@ -18,6 +18,8 @@ Modules existants :
   (en-têtes, jeton, reprise, journal), transport remplaçable.
 - **`SUFirestore`** — lire, écrire et interroger Firestore. L'adaptateur SDK vit dans
   `SUFirestoreLive`, derrière le trait `Firebase`.
+- **`SUAuth`** — connexion, état de session, jetons, gestion de compte. L'adaptateur SDK
+  vit dans `SUAuthLive`, derrière le trait `Firebase`.
 - **`SUStorage`** — téléverser, télécharger et lister des fichiers, avec progression.
   L'adaptateur SDK vit dans `SUStorageLive`, derrière le trait `Firebase`.
 - **`SULogger`** — tracer ce que l'app fait : `OSLog`, fichiers avec rotation, et une
