@@ -157,6 +157,134 @@ do {
 
 ---
 
+## SUNetworking
+
+Appeler une API HTTP, sans que l'app connaisse `URLSession`.
+
+### Déclarer ses services et ses endpoints
+
+**Le module n'en déclare aucun** — comme pour les clés de `SUPersistence`, ils appartiennent
+à l'app.
+
+```swift
+import SUNetworking
+
+extension APIService {
+    static let account: APIService = "account"
+}
+
+extension APIEnvironment {
+    static let production = APIEnvironment([
+        .account: URL(string: "https://api.lensy.app/v1")!
+    ])
+}
+
+struct FetchProfile: Endpoint {
+    typealias Response = Profile
+
+    let userID: String
+    var service: APIService { .account }
+    var path: String { "/users/\(userID)" }
+    var authentication: AuthRequirement { .required }
+}
+```
+
+Tout a un défaut sauf le service, le chemin et le type de réponse : un `GET` public tient
+en trois lignes, et le décodage JSON est fourni dès que `Response` est `Decodable`.
+
+### Monter le store
+
+```swift
+@main
+struct LensyApp: App {
+    private let network = NetworkStore(
+        environment: .production,
+        middlewares: [
+            DefaultHeadersMiddleware(["Accept": "application/json"]),
+            TokenMiddleware(provider: FirebaseTokenProvider()),
+            RetryMiddleware(),
+        ]
+    )
+
+    var body: some Scene {
+        WindowGroup { RootView() }
+            .environment(network)
+    }
+}
+```
+
+`NetworkStore` n'a **pas** de `shared` : il lui faut les URL de base de vos services, que
+seule l'app connaît. Un singleton sans environnement ne pourrait que planter ou mentir.
+
+### Appeler
+
+```swift
+struct ProfileView: View {
+    @Environment(NetworkStore.self) private var network
+    @State private var profile: Profile?
+
+    var body: some View {
+        content
+            .overlay { if network.isLoading { ProgressView() } }
+            .task { profile = try? await network.send(FetchProfile(userID: "42")) }
+    }
+}
+```
+
+`isLoading` et `lastError` sont observés : de quoi piloter un indicateur global et une
+bannière d'erreur sans les câbler à la main.
+
+### Middlewares
+
+| Middleware | Rôle |
+|---|---|
+| `DefaultHeadersMiddleware` | En-têtes communs. Un en-tête posé par l'endpoint n'est jamais écrasé. |
+| `TokenMiddleware` | Joint un jeton, et rejoue **une** fois sur 401 avec un jeton rafraîchi. |
+| `RetryMiddleware` | Rejoue les pannes transitoires : backoff exponentiel avec jitter, `Retry-After` respecté, verbes non idempotents épargnés. |
+| `LoggingMiddleware` | Raconte chaque requête au `NetworkLogger` de l'app. |
+
+L'ordre compte : le premier est le plus extérieur. `RetryMiddleware` se place **après**
+`TokenMiddleware`, pour que chaque tentative reparte avec un jeton valide.
+
+### Firebase sans le SDK Firebase
+
+`TokenMiddleware` ne connaît pas Firebase. Il demande un jeton à un `TokenProvider`, que
+l'app implémente :
+
+```swift
+struct FirebaseTokenProvider: TokenProvider {
+    func token(forceRefresh: Bool) async throws -> String? {
+        try await Auth.auth().currentUser?.getIDToken(forcingRefresh: forceRefresh)
+    }
+}
+```
+
+Le même middleware sert pour App Check, sur un autre en-tête et sans schéma :
+
+```swift
+TokenMiddleware(provider: AppCheckProvider(), header: "X-Firebase-AppCheck", scheme: nil)
+```
+
+Aucune dépendance n'entre dans le package, et toute la chaîne d'authentification se teste
+avec un fournisseur de trois lignes.
+
+### Tester
+
+`MockTransport` ne touche jamais au réseau, et enregistre ce qu'on lui demande — de quoi
+affirmer *comment* la requête a été formée, pas seulement ce qu'elle a rendu.
+
+```swift
+let transport = MockTransport([.status(200, json: #"{"name":"Florent"}"#)])
+let store = NetworkStore(environment: .production, transport: transport)
+
+let profile = try await store.send(FetchProfile(userID: "42"))
+
+#expect(profile.name == "Florent")
+#expect(await transport.lastRequest?.headers["Authorization"] != nil)
+```
+
+---
+
 ## Développement
 
 Ouvrir le package seul, pour le travailler et lancer ses tests :

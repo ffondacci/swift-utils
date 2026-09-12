@@ -12,6 +12,7 @@ let package = Package(
     ],
     products: [
         .library(name: "SUPersistence", targets: ["SUPersistence"]),
+        .library(name: "SUNetworking", targets: ["SUNetworking"]),
     ],
     targets: [
         .target(
@@ -22,9 +23,22 @@ let package = Package(
                 .enableUpcomingFeature("ExistentialAny"),
             ]
         ),
+        .target(
+            name: "SUNetworking",
+            swiftSettings: [
+                .enableUpcomingFeature("ExistentialAny"),
+            ]
+        ),
         .testTarget(
             name: "SUPersistenceTests",
             dependencies: ["SUPersistence"],
+            swiftSettings: [
+                .enableUpcomingFeature("ExistentialAny"),
+            ]
+        ),
+        .testTarget(
+            name: "SUNetworkingTests",
+            dependencies: ["SUNetworking"],
             swiftSettings: [
                 .enableUpcomingFeature("ExistentialAny"),
             ]

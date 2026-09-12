@@ -9,10 +9,16 @@ carte. Rien n'est une app, rien n'a d'UI — ce sont des briques.
 Premier consommateur : **Lensy** (`../lensy`, iOS 26.5). Le package vise plus bas que lui
 volontairement — voir les décisions figées.
 
-Premier utilitaire : **`SUPersistence`** — sauvegarder et relire des valeurs, via
-`UserDefaults` ou un fichier `.json` aujourd'hui, via SwiftData / SQLite demain, **sans
-que l'app appelante change une ligne**. C'est le test de l'architecture : si changer de
-backend oblige à toucher au code de l'app, l'architecture est ratée.
+Modules existants :
+
+- **`SUPersistence`** — sauvegarder et relire des valeurs, via `UserDefaults` ou un
+  fichier `.json` aujourd'hui, via SwiftData / SQLite demain, **sans que l'app appelante
+  change une ligne**.
+- **`SUNetworking`** — appeler une API HTTP : endpoints typés, chaîne de middlewares
+  (en-têtes, jeton, reprise, journal), transport remplaçable.
+
+C'est le test de l'architecture : si changer de backend ou de transport oblige à toucher
+au code de l'app, l'architecture est ratée.
 
 ## Décisions figées
 
@@ -24,7 +30,8 @@ backend oblige à toucher au code de l'app, l'architecture est ratée.
 | Toolchain | `// swift-tools-version: 6.0`, langage Swift 6 | Swift 6 impose la stricte concurrence par défaut. On reste en 6.0 (et non 6.2+) pour ne pas exiger le dernier Xcode chez le consommateur. |
 | Découpage | 1 utilitaire = 1 module = 1 produit `.library` | La frontière de module fait respecter la separation of concerns **par le compilateur**, pas par la discipline. |
 | Nommage | Préfixe `SU` sur les **modules seulement** | Un nom de module est global chez le consommateur. Les types, eux, sont déjà namespacés par leur module : `import SUPersistence` puis `PersistenceStore`, pas `SUPersistenceStore`. |
-| Point d'entrée | 1 store singleton **par module** | Une app qui n'importe que `SUPersistence` ne traîne pas le reste. Pas de module chapeau qui dépendrait de tous les autres. |
+| Point d'entrée | 1 store **par module** | Une app qui n'importe que `SUPersistence` ne traîne pas le reste. Pas de module chapeau qui dépendrait de tous les autres. |
+| Singleton | Seulement quand un défaut a du sens | `PersistenceStore.shared` s'adosse à `UserDefaults.standard`, ce qui est un choix défendable sans rien savoir de l'app. `NetworkStore` n'a pas de `shared` : il lui faut les URL de base des services, que seule l'app connaît, et un singleton sans environnement ne pourrait que planter ou mentir. |
 | Tests | Swift Testing | `async` natif, tests paramétrés, traits de parallélisme — aligné avec du code concurrency-first. |
 | Dépendances | Aucune, hors SDK Apple | Une brique qui traîne un arbre de dépendances n'est pas une brique. |
 
@@ -127,13 +134,13 @@ swift-utils/
 ├── CLAUDE.md
 ├── README.md
 ├── Sources/
-│   └── SUPersistence/
-│       ├── Store/
-│       ├── Repository/
-│       ├── Coding/
-│       └── Backend/
+│   ├── SUPersistence/
+│   │   ├── Store/ Repository/ Coding/ Backend/
+│   └── SUNetworking/
+│       ├── Store/ Client/ Middleware/ Transport/ Endpoint/ Policy/
 └── Tests/
-    └── SUPersistenceTests/
+    ├── SUPersistenceTests/
+    └── SUNetworkingTests/
 ```
 
 ## Intégration dans une app
@@ -172,14 +179,27 @@ ne peut appartenir qu'à un workspace ouvert à la fois :
 
 1. `Sources/SU<Nom>/`, découpé en couches comme ci-dessus.
 2. Un produit `.library(name: "SU<Nom>")` et sa target dans `Package.swift`.
-3. Un store `@MainActor @Observable` avec `static let shared`, seule surface publique
-   d'usage.
+3. Un store `@MainActor @Observable`, seule surface publique d'usage. Avec
+   `static let shared` **si et seulement si** une configuration par défaut a du sens sans
+   rien savoir de l'app.
 4. `Tests/SU<Nom>Tests/`.
 5. Une section dans le `README.md` : à quoi ça sert, comment on l'injecte, un exemple.
 6. Une page de wiki dédiée, plus la ligne correspondante dans `Home`.
 
 Un utilitaire ne dépend d'un autre utilitaire que si Florent l'a validé explicitement.
 Par défaut, les modules sont indépendants.
+
+## Pièges connus du compilateur
+
+**Swift 6.3.3 plante en abaissement SIL** sur une closure à typed throws qui **retourne**
+une closure à typed throws — typiquement la composition d'une chaîne de middlewares par
+`reduce`. Le message est un `signal 5`, sans ligne fautive utile.
+
+Contournement en place dans `SUNetworking/Client/APIClient.swift` : un type `Link`
+explicite qui porte l'index du maillon courant, au lieu de closures imbriquées. Même
+comportement, un seul niveau de closure.
+
+Si une composition de closures typées plante sans raison apparente, c'est probablement ça.
 
 ## Wiki — à mettre à jour avec le code
 
