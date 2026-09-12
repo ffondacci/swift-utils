@@ -1,8 +1,5 @@
-#if FileLogging
 import Foundation
 import Synchronization
-import SwiftyBeaver
-import SULogger
 
 /// Écrit les traces sur disque, avec rotation.
 ///
@@ -17,9 +14,9 @@ import SULogger
 /// let urls = file.archivedFileURLs   // à joindre à un rapport de support
 /// ```
 ///
-/// > **Le handle est persistant.** La `FileDestination` d'origine de SwiftyBeaver rouvre
-/// > et re-`stat` le fichier à chaque ligne — mesuré dans `UniLogger`, et corrigé là-bas
-/// > de la même façon. Ici le descripteur reste ouvert et la taille est suivie en mémoire.
+/// > **Le handle reste ouvert**, et la taille est suivie en mémoire. Rouvrir et re-`stat`
+/// > le fichier à chaque ligne — ce que fait la destination fichier de SwiftyBeaver — a un
+/// > coût mesuré dans `UniLogger`, qui l'a corrigé de la même façon.
 public final class FileDestination: LogDestination {
 
     /// Ce qui gouverne la rotation.
@@ -91,11 +88,6 @@ public final class FileDestination: LogDestination {
 
     public func write(_ entry: LogEntry) {
         append(entry.formatted)
-    }
-
-    /// Écrit une ligne déjà formatée. Utilisé par ``SwiftyBeaverBridge``.
-    public func append(line: String) {
-        append(line)
     }
 
     // MARK: - Fichiers
@@ -199,45 +191,4 @@ public final class FileDestination: LogDestination {
     }
 }
 
-/// Branche cette destination sur un pipeline **SwiftyBeaver existant**.
-///
-/// `Log` n'en a pas besoin : il écrit directement dans ``FileDestination``. Ce pont sert
-/// aux apps qui ont déjà du `SwiftyBeaver.debug(…)` ailleurs et veulent que ces lignes
-/// finissent dans le même fichier.
-///
-/// ```swift
-/// let file = try FileDestination()
-/// SwiftyBeaver.addDestination(SwiftyBeaverBridge(writing: file))
-/// ```
-///
-/// > Ce type n'est **pas** `Sendable`, et ne peut pas l'être : il hérite de
-/// > `BaseDestination`, une classe que le SDK ne marque pas, et Swift 6 interdit à une
-/// > classe `Sendable` d'hériter d'autre chose que `NSObject`. C'est donc à SwiftyBeaver
-/// > d'en garantir l'usage, comme pour ses propres destinations.
-public final class SwiftyBeaverBridge: BaseDestination {
 
-    private let file: FileDestination
-
-    public init(writing file: FileDestination) {
-        self.file = file
-        super.init()
-    }
-
-    public override func send(
-        _ level: SwiftyBeaver.Level,
-        msg: String,
-        thread: String,
-        file source: String,
-        function: String,
-        line: Int,
-        context: Any? = nil
-    ) -> String? {
-        let formatted = super.send(
-            level, msg: msg, thread: thread,
-            file: source, function: function, line: line, context: context
-        )
-        if let formatted { file.append(line: formatted) }
-        return formatted
-    }
-}
-#endif

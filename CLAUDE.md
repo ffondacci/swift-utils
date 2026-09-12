@@ -18,8 +18,8 @@ Modules existants :
   (en-têtes, jeton, reprise, journal), transport remplaçable.
 - **`SUFirestore`** — lire, écrire et interroger Firestore. L'adaptateur SDK vit dans
   `SUFirestoreLive`, derrière le trait `Firebase`.
-- **`SULogger`** — tracer ce que l'app fait. `OSLog` sans dépendance ; l'écriture fichier
-  vit dans `SULoggerFile`, derrière le trait `FileLogging`.
+- **`SULogger`** — tracer ce que l'app fait : `OSLog`, fichiers avec rotation, et une
+  configuration surchargeable par arbre de tâches. Aucune dépendance.
 
 Le journal est la seule surface qui **n'est pas** un store `@MainActor` : on trace depuis
 n'importe où, et personne ne devrait écrire `await` pour laisser une trace.
@@ -37,6 +37,7 @@ au code de l'app, l'architecture est ratée.
 | Toolchain | `// swift-tools-version: 6.2`, langage Swift 6 | Le mode langage 6 est le plus récent qui existe — il n'y a pas de mode 6.1 ou 6.2. C'est le **tools-version** qui donne accès aux évolutions récentes, et 6.2 débloque les traits SPM et la concurrence « approachable ». Le coût est d'exiger Xcode 26 chez le consommateur ; les seuls consommateurs sont les apps de Florent, qui y sont déjà. |
 | Concurrence | `defaultIsolation(nil)`, `NonisolatedNonsendingByDefault`, `InferIsolatedConformances`, `ExistentialAny`, `strictMemorySafety` | Voir `commonSwiftSettings` dans `Package.swift` : chaque réglage change la sémantique, aucun n'est décoratif. `SUFirestoreLive` utilise `interopSwiftSettings`, identique mais sans `strictMemorySafety` : son métier est d'appeler un SDK Objective-C, que le réglage signalerait ligne par ligne sans rien apprendre. |
 | Dépendances lourdes | Derrière un **trait SPM** | `firebase-ios-sdk` pèse 144 Mo et 14 paquets. Sans le trait `Firebase`, SwiftPM ne le télécharge même pas : une app qui ne veut que `SUPersistence` paie 0 octet. |
+| Dépendances légères | **Pas de dépendance du tout** | Un trait ne se justifie que si la dépendance coûte cher. SwiftyBeaver (444 Ko) a été retiré : il ne portait plus qu'un pont dont aucune app ne se servait, et l'écrire nous-mêmes coûtait moins que le gérer. |
 | Découpage | 1 utilitaire = 1 module = 1 produit `.library` | La frontière de module fait respecter la separation of concerns **par le compilateur**, pas par la discipline. |
 | Nommage | Préfixe `SU` sur les **modules seulement** | Un nom de module est global chez le consommateur. Les types, eux, sont déjà namespacés par leur module : `import SUPersistence` puis `PersistenceStore`, pas `SUPersistenceStore`. |
 | Point d'entrée | 1 store **par module** | Une app qui n'importe que `SUPersistence` ne traîne pas le reste. Pas de module chapeau qui dépendrait de tous les autres. |

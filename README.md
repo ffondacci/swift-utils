@@ -612,12 +612,9 @@ Log.configure(LogConfiguration(
 
 ### Écrire dans un fichier
 
-Derrière le trait **FileLogging** (SwiftyBeaver, 444 Ko). Sans lui, `SULogger` fonctionne
-quand même : OSLog fait l'essentiel et n'a aucune dépendance.
+Disponible par défaut, sans dépendance.
 
 ```swift
-import SULoggerFile
-
 let file = try FileDestination()                        // Library/Logs/app.log
 Log.configure(LogConfiguration(destinations: [OSLogDestination(), file]))
 
@@ -631,15 +628,9 @@ Rotation par taille (5 Mo) et nombre d'archives (3) par défaut. La rotation a l
 l'écriture : la ligne la plus récente est toujours dans le fichier courant, et aucun fichier
 ne dépasse la taille annoncée.
 
-> Le handle reste ouvert. La `FileDestination` d'origine de SwiftyBeaver rouvre et re-`stat`
-> le fichier à chaque ligne — un coût mesuré dans `UniLogger` et corrigé là-bas de la même
+> Le handle reste ouvert et la taille est suivie en mémoire. Rouvrir et re-`stat` le
+> fichier à chaque ligne a un coût mesuré dans `UniLogger`, qui l'a corrigé de la même
 > façon.
-
-Pour une app qui a déjà un pipeline SwiftyBeaver ailleurs :
-
-```swift
-SwiftyBeaver.addDestination(SwiftyBeaverBridge(writing: file))
-```
 
 ### Les autres modules tracent déjà
 

@@ -1,11 +1,9 @@
-#if FileLogging
 import Foundation
-import SULogger
-import SULoggerFile
+@testable import SULogger
 import Testing
 
 /// Ce que `OSLog` ne fait pas : repartir avec le journal d'une session.
-@Suite("Journal fichier", .serialized)
+@Suite("Journal fichier")
 struct FileDestinationTests {
 
     private func temporaryDirectory() -> URL {
@@ -145,18 +143,17 @@ struct FileDestinationTests {
     }
 
     @Test("branchée sur Log, elle reçoit les traces de l'app")
-    func worksAsALogDestination() throws {
+    func worksAsALogDestination() async throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let destination = try FileDestination(directory: directory)
-        Log.configure(LogConfiguration(destinations: [destination]))
-        defer { Log.configure(.silent) }
 
-        Log.error("échec réseau", category: .network)
+        await Log.withConfiguration(LogConfiguration(destinations: [destination])) {
+            Log.error("échec réseau", category: .network)
+        }
 
         let text = contents(of: destination.currentFileURL)
         #expect(text.contains("échec réseau"))
         #expect(text.contains("[network]"))
     }
 }
-#endif
