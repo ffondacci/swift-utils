@@ -48,4 +48,18 @@ public protocol FirestoreClient: Sendable {
 
     /// Applique un lot d'écritures de façon atomique.
     func commit(_ operations: [DocumentWrite]) async throws(FirestoreError)
+
+    /// Exécute une transaction : lire, décider, écrire, sans qu'un autre client
+    /// s'intercale.
+    ///
+    /// Le corps peut être **rejoué** en cas de conflit — n'y mettez aucun effet de bord.
+    ///
+    /// Le corps peut jeter **n'importe quelle** erreur pour abandonner : une erreur qui
+    /// n'est pas une ``FirestoreError`` devient une
+    /// ``FirestoreError/transactionCancelled(reason:)``. C'est ce qui permet d'exprimer un
+    /// refus métier — « solde insuffisant » — sans emprunter un cas qui ne lui correspond
+    /// pas.
+    func runTransaction(
+        _ body: @Sendable @escaping (any TransactionContext) throws -> Void
+    ) async throws(FirestoreError)
 }

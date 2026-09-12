@@ -181,6 +181,46 @@ public actor InMemoryFirestore: FirestoreClient {
         documents = staged
     }
 
+    // MARK: - Transactions
+
+    public func runTransaction(
+        _ body: @Sendable @escaping (any TransactionContext) throws -> Void
+    ) throws(FirestoreError) {
+        try consumeScheduledError()
+
+        let transaction = InMemoryTransaction(snapshot: documents)
+        do {
+            try body(transaction)
+        } catch let error as FirestoreError {
+            throw error
+        } catch {
+            throw FirestoreError.transactionCancelled(reason: "\(error)")
+        }
+
+        // Atomique comme le reste : on prépare, on publie ensuite.
+        var staged = documents
+        for operation in transaction.collectedWrites {
+            switch operation {
+            case let .set(path, value, merge):
+                let data = try encode(value, at: path)
+                staged[path] = merge ? try merged(data, into: staged[path], at: path) : data
+            case let .update(path, fields):
+                guard let existing = staged[path] else { throw .notFound(path: path) }
+                guard var object = (try? JSONSerialization.jsonObject(with: existing)) as? [String: Any] else {
+                    throw .decodingFailed(path: path, type: "document", reason: "contenu illisible")
+                }
+                Self.apply(fields, to: &object)
+                guard let encoded = try? JSONSerialization.data(withJSONObject: object) else {
+                    throw .encodingFailed(path: path, type: "document", reason: "champs non sérialisables")
+                }
+                staged[path] = encoded
+            case let .delete(path):
+                staged.removeValue(forKey: path)
+            }
+        }
+        documents = staged
+    }
+
     // MARK: - Octets
 
     private func write(_ data: Data, at path: String, merge: Bool) throws(FirestoreError) {

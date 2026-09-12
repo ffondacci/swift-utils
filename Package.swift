@@ -97,6 +97,11 @@ let package = Package(
             swiftSettings: commonSwiftSettings
         ),
         .testTarget(
+            name: "SUFirestoreLiveTests",
+            dependencies: ["SUFirestore", "SUFirestoreLive"],
+            swiftSettings: commonSwiftSettings
+        ),
+        .testTarget(
             name: "SUFirestoreTests",
             dependencies: ["SUFirestore"],
             swiftSettings: commonSwiftSettings

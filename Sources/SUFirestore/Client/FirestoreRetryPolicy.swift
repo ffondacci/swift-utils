@@ -115,7 +115,7 @@ extension FirestoreError {
         case .deadlineExceeded: .deadlineExceeded
         case .permissionDenied, .notFound, .alreadyExists, .unauthenticated,
              .failedPrecondition, .invalidArgument, .decodingFailed,
-             .encodingFailed, .cancelled, .unknown:
+             .encodingFailed, .cancelled, .transactionCancelled, .unknown:
             nil
         }
     }

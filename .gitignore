@@ -66,3 +66,11 @@ Tests/Fixtures/emulator/functions/node_modules/
 Tests/Fixtures/emulator/functions/package-lock.json
 Tests/Fixtures/emulator/**/*-debug.log
 Tests/Fixtures/emulator/.firebase/
+
+# Package.resolved n'est pas versionné : c'est une bibliothèque, pas une app.
+#
+# Le fichier d'une bibliothèque est de toute façon ignoré par ses consommateurs — seul
+# celui du paquet racine compte. Mais s'il est versionné ici, il épingle les dépendances
+# résolues avec le trait « Firebase » actif, et SwiftPM les retélécharge alors même pour un
+# build SANS le trait. L'élagage ne fonctionne qu'à partir d'un état non épinglé.
+Package.resolved

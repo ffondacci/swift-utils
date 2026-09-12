@@ -91,6 +91,17 @@ public struct RetryingFirestore: FirestoreClient {
         }
     }
 
+    /// Firestore rejoue déjà les transactions en conflit de son côté. On ajoute quand
+    /// même la reprise du module, qui couvre ce que le SDK ne couvre pas : une coupure
+    /// réseau entre deux tentatives.
+    public func runTransaction(
+        _ body: @Sendable @escaping (any TransactionContext) throws -> Void
+    ) async throws(FirestoreError) {
+        try await retrying { () async throws(FirestoreError) in
+            try await wrapped.runTransaction(body)
+        }
+    }
+
     // MARK: - Reprise
 
     private func retrying<T>(

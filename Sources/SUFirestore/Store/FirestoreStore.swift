@@ -250,6 +250,39 @@ public final class FirestoreStore {
         try await deleteDocument(at: collection.document(id))
     }
 
+    /// Lire, décider, écrire — sans qu'un autre client s'intercale.
+    ///
+    /// Un lot écrit sans lire ; une transaction lit d'abord et décide ensuite. C'est ce
+    /// qu'il faut dès que la nouvelle valeur dépend de l'ancienne autrement que par un
+    /// simple incrément.
+    ///
+    /// ```swift
+    /// try await store.transaction { transaction in
+    ///     let compte = try transaction.document("c1", in: .comptes)
+    ///     guard let compte, compte.solde >= montant else {
+    ///         // Le corps n'est pas typé, donc le type est nommé ici — ou jetez
+    ///         // simplement votre propre erreur métier.
+    ///         throw FirestoreError.transactionCancelled(reason: "solde insuffisant")
+    ///     }
+    ///     transaction.set(compte.débité(de: montant), id: "c1", in: .comptes)
+    /// }
+    /// ```
+    ///
+    /// Le corps peut jeter **n'importe quelle** erreur pour abandonner : ce qui n'est pas
+    /// une ``FirestoreError`` devient une
+    /// ``FirestoreError/transactionCancelled(reason:)``. Vos erreurs métier passent donc
+    /// telles quelles, sans emprunter un cas qui ne leur correspond pas.
+    ///
+    /// - Important: toutes les lectures doivent précéder toutes les écritures, et le corps
+    ///   peut être **rejoué** en cas de conflit — n'y mettez aucun effet de bord.
+    public func transaction(
+        _ body: @Sendable @escaping (any TransactionContext) throws -> Void
+    ) async throws(FirestoreError) {
+        try await tracked { () async throws(FirestoreError) in
+            try await client.runTransaction(body)
+        }
+    }
+
     /// Oublie la dernière erreur, une fois qu'elle a été montrée.
     public func clearLastError() {
         lastError = nil

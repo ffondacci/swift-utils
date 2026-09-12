@@ -511,6 +511,29 @@ if let snapshot = try await store.snapshot("u1", in: .profiles),
 `increment` est la **seule** opération relative du module, et une écriture qui en contient
 une n'est jamais rejouée — la rejouer après un timeout douteux compterait deux fois.
 
+### Transactions
+
+Un lot écrit sans lire. Une transaction **lit d'abord et décide ensuite** — ce qu'il faut
+dès que la nouvelle valeur dépend de l'ancienne autrement que par un incrément.
+
+```swift
+try await store.transaction { transaction in
+    guard let compte = try transaction.document("c1", in: .comptes),
+          compte.solde >= montant
+    else {
+        throw InsufficientFunds()          // n'importe quelle erreur abandonne
+    }
+    transaction.set(compte.débité(de: montant), id: "c1", in: .comptes)
+}
+```
+
+Deux règles que le double en mémoire **vérifie**, pour qu'on les découvre en test et non en
+production :
+
+- **Toutes les lectures avant toutes les écritures.** Firestore l'impose ; lire après avoir
+  écrit jette une `invalidArgument`.
+- **Le corps peut être rejoué** en cas de conflit — n'y mettez aucun effet de bord.
+
 ### Erreurs
 
 `FirestoreError` nomme les codes plutôt que de les compter : `permissionDenied`,
@@ -535,6 +558,17 @@ try await store.setDocument(profile, id: "u1", in: .profiles)
 
 Il ne rejoue ni les règles de sécurité, ni les index composites : il teste **votre** code,
 pas Firestore.
+
+Et pour vérifier que le double dit bien la vérité, `Tests/Fixtures/emulator/` fait tourner
+les mêmes scénarios contre un **vrai Firestore** local :
+
+```bash
+cd Tests/Fixtures/emulator
+firebase emulators:start --only functions,firestore --project demo-swift-utils
+SU_EMULATOR=1 swift test --traits Firebase
+```
+
+Aucun projet Firebase n'existe derrière — `demo-` est reconnu comme factice.
 
 ---
 

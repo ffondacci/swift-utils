@@ -56,6 +56,13 @@ public enum FirestoreError: Error, Sendable, Equatable {
     /// L'opération a été annulée.
     case cancelled
 
+    /// **Le corps d'une transaction a décidé d'abandonner.**
+    ///
+    /// Ce n'est pas un incident : c'est une règle métier qui refuse — un solde
+    /// insuffisant, un état qui ne permet pas l'opération. Distinct de ``aborted`` , qui
+    /// signale une contention technique et mérite d'être rejoué.
+    case transactionCancelled(reason: String)
+
     /// Un code que le module ne connaît pas encore. Il porte le code brut pour qu'on
     /// puisse au moins le diagnostiquer.
     case unknown(path: String?, code: Int, reason: String)
@@ -74,7 +81,7 @@ public enum FirestoreError: Error, Sendable, Equatable {
         case let .unknown(path, _, _):
             path
         case .unavailable, .unauthenticated, .failedPrecondition,
-             .resourceExhausted, .aborted, .cancelled:
+             .resourceExhausted, .aborted, .cancelled, .transactionCancelled:
             nil
         }
     }
@@ -89,7 +96,7 @@ public enum FirestoreError: Error, Sendable, Equatable {
             true
         case .permissionDenied, .notFound, .alreadyExists, .unauthenticated,
              .failedPrecondition, .invalidArgument, .decodingFailed,
-             .encodingFailed, .cancelled, .unknown:
+             .encodingFailed, .cancelled, .transactionCancelled, .unknown:
             false
         }
     }
@@ -100,7 +107,7 @@ public enum FirestoreError: Error, Sendable, Equatable {
         case .unauthenticated: true
         case .permissionDenied, .notFound, .alreadyExists, .unavailable, .deadlineExceeded,
              .failedPrecondition, .resourceExhausted, .aborted, .invalidArgument,
-             .decodingFailed, .encodingFailed, .cancelled, .unknown:
+             .decodingFailed, .encodingFailed, .cancelled, .transactionCancelled, .unknown:
             false
         }
     }
@@ -136,6 +143,8 @@ extension FirestoreError: CustomStringConvertible {
             "Encodage de \(type) impossible vers « \(path) » : \(reason)"
         case .cancelled:
             "Opération annulée"
+        case let .transactionCancelled(reason):
+            "Transaction abandonnée : \(reason)"
         case let .unknown(path, code, reason):
             path.map { "Erreur Firestore \(code) sur « \($0) » : \(reason)" }
                 ?? "Erreur Firestore \(code) : \(reason)"

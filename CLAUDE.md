@@ -233,6 +233,24 @@ ne peut appartenir qu'à un workspace ouvert à la fois :
 Un utilitaire ne dépend d'un autre utilitaire que si Florent l'a validé explicitement.
 Par défaut, les modules sont indépendants.
 
+## Le trait n'élague que si rien n'est épinglé
+
+`Package.resolved` **n'est pas versionné**, et ce n'est pas un oubli.
+
+Une bibliothèque n'a pas à le committer — celui d'un consommateur fait foi de toute façon.
+Mais surtout : s'il est présent après un build `--traits Firebase`, il épingle les quatorze
+paquets du SDK, et **SwiftPM les retélécharge même pour un build sans le trait**.
+
+Mesuré sur ce dépôt :
+
+| État de départ | checkouts |
+|---|---|
+| vierge | 0 |
+| `Package.resolved` issu d'un build avec trait | 14 |
+
+Donc : ne jamais le committer, et si un chiffre de checkouts surprend, commencer par
+`rm -rf .build Package.resolved`.
+
 ## Pièges connus du compilateur
 
 **Swift 6.3.3 plante en abaissement SIL** sur une closure à typed throws qui **retourne**
@@ -299,6 +317,21 @@ Xcode n'est pas touché : il utilise son propre linker et ne lit pas ce `PATH`.
 Les règles globales s'appliquent : **tout ce qui vit dans git s'écrit en anglais** —
 messages de commit, noms de branches, titres et descriptions de MR, tags. Les échanges
 avec Florent restent en français.
+
+### Versions — ne pas tagger pour rien
+
+**Un tag se pose quand un consommateur en a besoin, pas à chaque fonctionnalité.**
+
+Tant qu'aucune app ne consomme le paquet, une « rupture » est théorique : il n'y a rien à
+casser. Trois majeures en une journée pour un paquet que personne n'a encore intégré, c'est
+du bruit — ça donne l'illusion d'une histoire de versions qui n'existe pas.
+
+La règle :
+
+- Le travail s'accumule sur `develop`, sans tag.
+- On tague **le jour où une app doit résoudre la dépendance**, ou quand Florent le demande.
+- À partir de là seulement, SemVer strict : une rupture d'API ou de format de données est
+  une majeure, parce qu'il y a désormais quelqu'un à casser.
 
 ### Branches
 

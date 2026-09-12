@@ -171,9 +171,37 @@ public struct LiveFirestore: FirestoreClient {
         }
     }
 
+    // MARK: - Transactions
+
+    public func runTransaction(
+        _ body: @Sendable @escaping (any TransactionContext) throws -> Void
+    ) async throws(FirestoreError) {
+        do {
+            _ = try await database.runTransaction { transaction, errorPointer in
+                do {
+                    try body(LiveTransaction(transaction: transaction, database: database))
+                    return nil
+                } catch let error as FirestoreError {
+                    errorPointer?.pointee = error as NSError
+                    return nil
+                } catch {
+                    // Firestore n'accepte pas qu'on jette depuis le corps : on lui passe
+                    // l'erreur par le pointeur, et il nous la rendra.
+                    errorPointer?.pointee = FirestoreError
+                        .transactionCancelled(reason: "\(error)") as NSError
+                    return nil
+                }
+            }
+        } catch let error as FirestoreError {
+            throw error
+        } catch {
+            throw Self.translate(error, path: nil)
+        }
+    }
+
     // MARK: - Conversions
 
-    private static func encode<Value: FirestoreValue>(
+    static func encode<Value: FirestoreValue>(
         _ value: Value,
         at path: String
     ) throws(FirestoreError) -> [String: Any] {
@@ -184,7 +212,7 @@ public struct LiveFirestore: FirestoreClient {
         }
     }
 
-    private static func firestoreFields(_ fields: [String: DocumentField]) -> [String: Any] {
+    static func firestoreFields(_ fields: [String: DocumentField]) -> [String: Any] {
         fields.mapValues(firestoreField(of:))
     }
 
@@ -256,7 +284,7 @@ public struct LiveFirestore: FirestoreClient {
     ///
     /// Le message d'un index manquant contient l'URL de création : elle est extraite ici
     /// plutôt que laissée à chaque appelant.
-    private static func translate(_ error: any Error, path: String?) -> FirestoreError {
+    static func translate(_ error: any Error, path: String?) -> FirestoreError {
         let nsError = error as NSError
         let reason = nsError.localizedDescription
 
@@ -285,6 +313,59 @@ public struct LiveFirestore: FirestoreClient {
             return nil
         }
         return URL(string: String(message[range]))
+    }
+}
+
+/// La transaction adossée au SDK.
+///
+/// `Transaction` n'est pas `Sendable` — le SDK compile en mode Swift 5 — mais cette
+/// instance ne vit que le temps du corps synchrone que Firestore exécute, et n'en sort
+/// jamais. L'annotation constate cette portée, elle ne promet rien d'autre.
+private final class LiveTransaction: TransactionContext, @unchecked Sendable {
+
+    private let transaction: Transaction
+    private let database: Firestore
+
+    init(transaction: Transaction, database: Firestore) {
+        self.transaction = transaction
+        self.database = database
+    }
+
+    func document<Value: FirestoreValue>(
+        at path: DocumentPath<Value>
+    ) throws(FirestoreError) -> Value? {
+        let snapshot: DocumentSnapshot
+        do {
+            snapshot = try transaction.getDocument(database.document(path.path))
+        } catch {
+            throw LiveFirestore.translate(error, path: path.path)
+        }
+
+        guard snapshot.exists else { return nil }
+        do {
+            return try snapshot.data(as: Value.self)
+        } catch {
+            throw .decodingFailed(path: path.path, type: "\(Value.self)", reason: "\(error)")
+        }
+    }
+
+    func set<Value: FirestoreValue>(_ value: Value, at path: DocumentPath<Value>, merge: Bool) {
+        guard let fields = try? LiveFirestore.encode(value, at: path.path) else { return }
+        transaction.setData(fields, forDocument: database.document(path.path), merge: merge)
+    }
+
+    func update<Value: FirestoreValue>(
+        _ fields: [String: DocumentField],
+        at path: DocumentPath<Value>
+    ) {
+        transaction.updateData(
+            LiveFirestore.firestoreFields(fields),
+            forDocument: database.document(path.path)
+        )
+    }
+
+    func delete<Value: FirestoreValue>(at path: DocumentPath<Value>) {
+        transaction.deleteDocument(database.document(path.path))
     }
 }
 
