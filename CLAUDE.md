@@ -176,9 +176,39 @@ ne peut appartenir qu'à un workspace ouvert à la fois :
    d'usage.
 4. `Tests/SU<Nom>Tests/`.
 5. Une section dans le `README.md` : à quoi ça sert, comment on l'injecte, un exemple.
+6. Une page de wiki dédiée, plus la ligne correspondante dans `Home`.
 
 Un utilitaire ne dépend d'un autre utilitaire que si Florent l'a validé explicitement.
 Par défaut, les modules sont indépendants.
+
+## Wiki — à mettre à jour avec le code
+
+Le wiki GitHub est la documentation de référence du dépôt : le `README` reste court et
+renvoie vers lui. Il vit dans un **dépôt git distinct** :
+
+```bash
+git clone https://github.com/ffondacci/swift-utils.wiki.git
+```
+
+**Il se met à jour dans le même mouvement que le code, jamais plus tard.** Une doc qui
+décrit une version antérieure est pire qu'une doc absente : elle fait perdre du temps avec
+de la confiance en prime. Concrètement, avant de considérer un changement terminé :
+
+| Ce qui change | La page à reprendre |
+|---|---|
+| API publique ajoutée, renommée, retirée | `SUPersistence` (guide d'usage) |
+| décision d'architecture, nouveau backend | `SUPersistence-Architecture` |
+| règle d'écriture | `Conventions` **et** ce fichier |
+| workflow, outillage, publication | `Developpement` |
+| nouveau module | une page dédiée + une ligne dans `Home` |
+| nouvelle app consommatrice | le tableau de `Home` |
+
+Pages existantes : `Home`, `_Sidebar`, `SUPersistence`, `SUPersistence-Architecture`,
+`Conventions`, `Developpement`.
+
+Le contenu des pages est en **français**, comme le `README` et ce fichier. Les messages de
+commit du wiki sont en **anglais**, comme partout dans git. La branche du dépôt wiki est
+`master`, pas `main`.
 
 ## Environnement — le linker
 
