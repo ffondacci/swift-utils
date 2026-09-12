@@ -572,6 +572,88 @@ Aucun projet Firebase n'existe derrière — `demo-` est reconnu comme factice.
 
 ---
 
+## SULogger
+
+Tracer ce que l'app fait, sans dépendance par défaut.
+
+```swift
+import SULogger
+
+Log.configure(.default)                       // OSLog, tout niveau
+
+Log.info("session démarrée")
+Log.error("échec : \(error)", category: .network)
+Log.debug("cache relu", category: .persistence)
+```
+
+Trois catégories — `app`, `network`, `persistence` — qui deviennent la `category` d'OSLog :
+c'est elle qui permet de filtrer dans Console.app ou `log stream` sans tout noyer.
+
+### Le message n'est construit que s'il sert
+
+```swift
+Log.debug("\(gros.description)")      // en production, jamais évalué
+```
+
+C'est un `@autoclosure` : filtré par le niveau ou la catégorie, la chaîne n'est **jamais**
+construite. Un test le vérifie en comptant les constructions.
+
+### Régler
+
+```swift
+Log.configure(LogConfiguration(
+    minimumLevel: .warning,               // en dessous, rien
+    categories: [.network],               // isoler un domaine
+    destinations: [OSLogDestination()]
+))
+```
+
+`.silent` coupe tout — pratique en test.
+
+### Écrire dans un fichier
+
+Derrière le trait **FileLogging** (SwiftyBeaver, 444 Ko). Sans lui, `SULogger` fonctionne
+quand même : OSLog fait l'essentiel et n'a aucune dépendance.
+
+```swift
+import SULoggerFile
+
+let file = try FileDestination()                        // Library/Logs/app.log
+Log.configure(LogConfiguration(destinations: [OSLogDestination(), file]))
+
+// pour un rapport de support
+let urls = file.allFileURLs
+let poids = file.totalSize
+try file.reset()
+```
+
+Rotation par taille (5 Mo) et nombre d'archives (3) par défaut. La rotation a lieu **avant**
+l'écriture : la ligne la plus récente est toujours dans le fichier courant, et aucun fichier
+ne dépasse la taille annoncée.
+
+> Le handle reste ouvert. La `FileDestination` d'origine de SwiftyBeaver rouvre et re-`stat`
+> le fichier à chaque ligne — un coût mesuré dans `UniLogger` et corrigé là-bas de la même
+> façon.
+
+Pour une app qui a déjà un pipeline SwiftyBeaver ailleurs :
+
+```swift
+SwiftyBeaver.addDestination(SwiftyBeaverBridge(writing: file))
+```
+
+### Brancher les autres modules
+
+`SUNetworking` définit son propre `NetworkLogger` pour rester indépendant. Le pont tient en
+trois lignes, côté app :
+
+```swift
+struct AppNetworkLogger: NetworkLogger {
+    func log(_ event: NetworkEvent) { Log.debug("\(event)", category: .network) }
+}
+```
+
+---
+
 ## Développement
 
 Ouvrir le package seul, pour le travailler et lancer ses tests :

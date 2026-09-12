@@ -37,11 +37,23 @@ let package = Package(
     products: [
         .library(name: "SUPersistence", targets: ["SUPersistence"]),
         .library(name: "SUNetworking", targets: ["SUNetworking"]),
+        .library(name: "SULogger", targets: ["SULogger"]),
+        .library(name: "SULoggerFile", targets: ["SULoggerFile"]),
         .library(name: "SUFirestore", targets: ["SUFirestore"]),
         .library(name: "SUFirestoreLive", targets: ["SUFirestoreLive"]),
     ],
     traits: [
         .default(enabledTraits: []),
+        .trait(
+            name: "FileLogging",
+            description: """
+                Active SULoggerFile, qui écrit les traces sur disque via SwiftyBeaver.
+
+                Sans ce trait, SULogger fonctionne quand même — OSLog fait l'essentiel et \
+                n'a aucune dépendance. Le trait n'ajoute que la persistance fichier, utile \
+                pour exporter une session de logs vers le support.
+                """
+        ),
         .trait(
             name: "Firebase",
             description: """
@@ -60,6 +72,7 @@ let package = Package(
         // Résolue uniquement si le trait « Firebase » est actif : SwiftPM élague les
         // dépendances dont le seul usage est derrière un trait désactivé.
         .package(url: "https://github.com/firebase/firebase-ios-sdk.git", from: "11.0.0"),
+        .package(url: "https://github.com/SwiftyBeaver/SwiftyBeaver.git", from: "2.1.0"),
     ],
     targets: [
         .target(
@@ -68,6 +81,22 @@ let package = Package(
         ),
         .target(
             name: "SUNetworking",
+            swiftSettings: commonSwiftSettings
+        ),
+        .target(
+            name: "SULogger",
+            swiftSettings: commonSwiftSettings
+        ),
+        .target(
+            name: "SULoggerFile",
+            dependencies: [
+                "SULogger",
+                .product(
+                    name: "SwiftyBeaver",
+                    package: "SwiftyBeaver",
+                    condition: .when(traits: ["FileLogging"])
+                ),
+            ],
             swiftSettings: commonSwiftSettings
         ),
         .target(
@@ -94,6 +123,16 @@ let package = Package(
         .testTarget(
             name: "SUNetworkingTests",
             dependencies: ["SUNetworking"],
+            swiftSettings: commonSwiftSettings
+        ),
+        .testTarget(
+            name: "SULoggerTests",
+            dependencies: ["SULogger"],
+            swiftSettings: commonSwiftSettings
+        ),
+        .testTarget(
+            name: "SULoggerFileTests",
+            dependencies: ["SULogger", "SULoggerFile"],
             swiftSettings: commonSwiftSettings
         ),
         .testTarget(

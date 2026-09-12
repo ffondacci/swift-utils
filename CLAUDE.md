@@ -16,6 +16,13 @@ Modules existants :
   **sans que l'app appelante change une ligne**.
 - **`SUNetworking`** — appeler une API HTTP : endpoints typés, chaîne de middlewares
   (en-têtes, jeton, reprise, journal), transport remplaçable.
+- **`SUFirestore`** — lire, écrire et interroger Firestore. L'adaptateur SDK vit dans
+  `SUFirestoreLive`, derrière le trait `Firebase`.
+- **`SULogger`** — tracer ce que l'app fait. `OSLog` sans dépendance ; l'écriture fichier
+  vit dans `SULoggerFile`, derrière le trait `FileLogging`.
+
+Le journal est la seule surface qui **n'est pas** un store `@MainActor` : on trace depuis
+n'importe où, et personne ne devrait écrire `await` pour laisser une trace.
 
 C'est le test de l'architecture : si changer de backend ou de transport oblige à toucher
 au code de l'app, l'architecture est ratée.
