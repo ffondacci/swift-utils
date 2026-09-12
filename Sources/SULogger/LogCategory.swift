@@ -14,8 +14,15 @@ public enum LogCategory: String, Sendable, Hashable, CaseIterable {
     /// Requêtes, réponses, authentification, reprises.
     case network
 
-    /// Lectures et écritures locales, caches, migrations.
+    /// Lectures et écritures **locales**, caches, migrations.
     case persistence
+
+    /// Firestore : documents, requêtes, lots, transactions, contention.
+    ///
+    /// Séparée de ``persistence`` à dessein — quand une donnée est fausse, la première
+    /// question est « locale ou distante ? », et deux catégories y répondent d'un coup
+    /// d'œil.
+    case firestore
 }
 
 /// La gravité d'une trace.

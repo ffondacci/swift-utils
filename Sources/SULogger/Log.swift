@@ -51,14 +51,41 @@ public enum Log {
 
     private static let configuration = Mutex<LogConfiguration>(.default)
 
+    /// Une configuration qui ne vaut que pour l'arbre de tâches courant.
+    ///
+    /// Elle existe pour une raison précise : `Log` porte un état global, et deux tests
+    /// parallèles qui le reconfigurent se marchent dessus. Une valeur task-local est
+    /// héritée par les tâches filles et **invisible des autres**, ce qui rend
+    /// ``withConfiguration(_:do:)`` sûr sans avoir à sérialiser quoi que ce soit.
+    ///
+    /// Le même mécanisme sert en production pour taire — ou détailler — un chemin précis.
+    @TaskLocal private static var scoped: LogConfiguration?
+
     /// Remplace le réglage courant. À appeler une fois au démarrage.
     public static func configure(_ newConfiguration: LogConfiguration) {
         configuration.withLock { $0 = newConfiguration }
     }
 
-    /// Le réglage courant.
+    /// Le réglage courant : celui de la portée s'il y en a un, le global sinon.
     public static var current: LogConfiguration {
-        configuration.withLock { $0 }
+        scoped ?? configuration.withLock { $0 }
+    }
+
+    /// Applique une configuration **le temps de `body`**, et pour lui seul.
+    ///
+    /// ```swift
+    /// try await Log.withConfiguration(LogConfiguration(minimumLevel: .debug)) {
+    ///     try await leCheminQuOnDébogue()
+    /// }
+    /// ```
+    ///
+    /// Les autres tâches gardent la configuration globale — c'est ce qui permet de détailler
+    /// un chemin sans inonder le reste, et à des tests parallèles de ne pas se gêner.
+    public static func withConfiguration<T>(
+        _ configuration: LogConfiguration,
+        do body: () async throws -> T
+    ) async rethrows -> T {
+        try await $scoped.withValue(configuration) { try await body() }
     }
 
     /// Ajoute une destination sans toucher aux autres.
@@ -115,13 +142,12 @@ public enum Log {
         _ file: String, _ function: String, _ line: Int
     ) {
         // Le filtre d'abord, le message ensuite : c'est tout l'intérêt de l'autoclosure.
-        let destinations = configuration.withLock { configuration -> [any LogDestination] in
-            guard level >= configuration.minimumLevel,
-                  configuration.categories.contains(category)
-            else { return [] }
-            return configuration.destinations
-        }
-        guard !destinations.isEmpty else { return }
+        let active = current
+        guard level >= active.minimumLevel,
+              active.categories.contains(category),
+              !active.destinations.isEmpty
+        else { return }
+        let destinations = active.destinations
 
         let entry = LogEntry(
             level: level,

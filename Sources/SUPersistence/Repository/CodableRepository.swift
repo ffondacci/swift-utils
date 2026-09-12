@@ -1,4 +1,5 @@
 import Foundation
+import SULogger
 
 /// Le repository standard : un backend pour les octets, un codeur pour les convertir.
 ///
@@ -81,6 +82,7 @@ public struct CodableRepository: PersistenceRepository {
         from collection: PersistenceCollection<Value>
     ) async throws(PersistenceError) -> [String: Value] {
         let keys = try await backend.keys(withPrefix: collection.storagePrefix)
+        Log.debug("collection « \(collection.name) » : \(keys.count) entrées", category: .persistence)
 
         var values: [String: Value] = [:]
         values.reserveCapacity(keys.count)
@@ -120,6 +122,7 @@ public struct CodableRepository: PersistenceRepository {
     // MARK: - Tout
 
     public func removeAll() async throws(PersistenceError) {
+        Log.info("effacement complet du stockage", category: .persistence)
         try await backend.removeAll()
     }
 
@@ -134,20 +137,44 @@ public struct CodableRepository: PersistenceRepository {
         do {
             data = try coder.encode(StoredValue(value: value))
         } catch {
-            throw .encodingFailed(key: name, type: "\(Value.self)", reason: error.reason)
+            let failure = PersistenceError.encodingFailed(key: name, type: "\(Value.self)", reason: error.reason)
+            Log.error("\(failure)", category: .persistence)
+            throw failure
         }
-        try await backend.write(data, for: storageKey)
+        do {
+            try await backend.write(data, for: storageKey)
+        } catch {
+            Log.error("\(error)", category: .persistence)
+            throw error
+        }
+        Log.debug("écrit « \(name) » (\(Value.self), \(data.count) o)", category: .persistence)
     }
 
     private func read<Value: PersistentValue>(
         _ storageKey: StorageKey,
         named name: String
     ) async throws(PersistenceError) -> StoredValue<Value>? {
-        guard let data = try await backend.read(storageKey) else { return nil }
+        let data: Data?
         do {
-            return try coder.decode(StoredValue<Value>.self, from: data)
+            data = try await backend.read(storageKey)
         } catch {
-            throw .decodingFailed(key: name, type: "\(Value.self)", reason: error.reason)
+            Log.error("\(error)", category: .persistence)
+            throw error
+        }
+        guard let data else {
+            Log.debug("« \(name) » absente", category: .persistence)
+            return nil
+        }
+        do {
+            let entry = try coder.decode(StoredValue<Value>.self, from: data)
+            Log.debug("relu « \(name) » (\(Value.self))", category: .persistence)
+            return entry
+        } catch {
+            // Le cas qui coûte le plus cher à diagnostiquer sans trace : la donnée est là,
+            // mais elle ne correspond plus au type — signature d'un changement de modèle.
+            let failure = PersistenceError.decodingFailed(key: name, type: "\(Value.self)", reason: error.reason)
+            Log.error("\(failure)", category: .persistence)
+            throw failure
         }
     }
 }

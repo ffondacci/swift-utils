@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SULogger
 
 /// Le point d'entrée du module, et la seule chose que l'app manipule au quotidien.
 ///
@@ -85,7 +86,7 @@ public final class FirestoreStore {
         at path: DocumentPath<Value>,
         source: ReadSource? = nil
     ) async throws(FirestoreError) -> FirestoreDocument<Value>? {
-        try await tracked { () async throws(FirestoreError) -> FirestoreDocument<Value>? in
+        try await tracked("lecture \(path.path)") { () async throws(FirestoreError) -> FirestoreDocument<Value>? in
             try await client.document(Value.self, at: path.path, source: source ?? defaultSource)
         }
     }
@@ -117,7 +118,7 @@ public final class FirestoreStore {
         query build: (DocumentQuery) -> DocumentQuery = { $0 }
     ) async throws(FirestoreError) -> FirestoreQueryResult<Value> {
         let query = build(DocumentQuery())
-        return try await tracked { () async throws(FirestoreError) -> FirestoreQueryResult<Value> in
+        return try await tracked("requête \(path.path)") { () async throws(FirestoreError) -> FirestoreQueryResult<Value> in
             try await client.documents(
                 Value.self,
                 in: path.path,
@@ -140,7 +141,7 @@ public final class FirestoreStore {
         at path: DocumentPath<Value>,
         merge: Bool = false
     ) async throws(FirestoreError) {
-        try await tracked { () async throws(FirestoreError) in
+        try await tracked("écriture \(path.path)\(merge ? " (merge)" : "")") { () async throws(FirestoreError) in
             try await client.setDocument(value, at: path.path, merge: merge)
         }
     }
@@ -153,7 +154,7 @@ public final class FirestoreStore {
         _ fields: [String: DocumentField],
         at path: DocumentPath<Value>
     ) async throws(FirestoreError) {
-        try await tracked { () async throws(FirestoreError) in
+        try await tracked("mise à jour \(path.path) \(fields.keys.sorted())") { () async throws(FirestoreError) in
             try await client.updateDocument(fields, at: path.path)
         }
     }
@@ -162,7 +163,7 @@ public final class FirestoreStore {
     public func deleteDocument<Value: FirestoreValue>(
         at path: DocumentPath<Value>
     ) async throws(FirestoreError) {
-        try await tracked { () async throws(FirestoreError) in
+        try await tracked("suppression \(path.path)") { () async throws(FirestoreError) in
             try await client.deleteDocument(at: path.path)
         }
     }
@@ -191,7 +192,7 @@ public final class FirestoreStore {
         }
 
         let operations = batch.operations
-        try await tracked { () async throws(FirestoreError) in
+        try await tracked("lot de \(operations.count) écritures") { () async throws(FirestoreError) in
             try await client.commit(operations)
         }
     }
@@ -278,7 +279,7 @@ public final class FirestoreStore {
     public func transaction(
         _ body: @Sendable @escaping (any TransactionContext) throws -> Void
     ) async throws(FirestoreError) {
-        try await tracked { () async throws(FirestoreError) in
+        try await tracked("transaction") { () async throws(FirestoreError) in
             try await client.runTransaction(body)
         }
     }
@@ -295,15 +296,21 @@ public final class FirestoreStore {
     /// Les appelants annotent le type d'erreur de leur closure — sans ça, Swift 6.3
     /// l'infère en `any Error` malgré le type du paramètre, et refuse la conversion.
     private func tracked<T>(
+        _ label: @autoclosure () -> String,
         _ operation: () async throws(FirestoreError) -> T
     ) async throws(FirestoreError) -> T {
         inFlightCount += 1
         defer { inFlightCount -= 1 }
 
         do {
-            return try await operation()
+            let result = try await operation()
+            Log.debug(label(), category: .firestore)
+            return result
         } catch {
             if error != .cancelled { lastError = error }
+            // Le label donne le chemin et l'opération ; l'erreur donne le code et la
+            // raison. Ensemble, ils suffisent à diagnostiquer sans rejouer.
+            Log.error("\(label()) — \(error)", category: .firestore)
             throw error
         }
     }

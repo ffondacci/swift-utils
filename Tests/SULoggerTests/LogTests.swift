@@ -28,29 +28,28 @@ final class MessageCounter: Sendable {
     var buildCount: Int { count.withLock { $0 } }
 }
 
-/// `Log` porte un état global : les tests s'exécutent en série pour ne pas se marcher
-/// dessus, et chacun repose la configuration.
-@Suite("Journal", .serialized)
+/// Les tests passent par ``Log/withConfiguration(_:do:)``, une valeur task-local : ils
+/// peuvent donc tourner en parallèle avec le reste de la suite sans se gêner, ce que
+/// l'API globale ne permettrait pas.
+@Suite("Journal")
 struct LogTests {
 
     private func withSpy(
         minimumLevel: LogLevel = .debug,
         categories: Set<LogCategory> = Set(LogCategory.allCases),
         _ body: (SpyDestination) -> Void
-    ) {
+    ) async {
         let spy = SpyDestination()
-        Log.configure(LogConfiguration(
-            minimumLevel: minimumLevel,
-            categories: categories,
-            destinations: [spy]
-        ))
-        body(spy)
-        Log.configure(.silent)
+        await Log.withConfiguration(
+            LogConfiguration(minimumLevel: minimumLevel, categories: categories, destinations: [spy])
+        ) {
+            body(spy)
+        }
     }
 
     @Test("une trace atteint la destination avec son niveau et sa catégorie")
-    func writesThrough() {
-        withSpy { spy in
+    func writesThrough() async {
+        await withSpy { spy in
             Log.error("échec", category: .network)
 
             #expect(spy.entries.count == 1)
@@ -61,16 +60,16 @@ struct LogTests {
     }
 
     @Test("la catégorie par défaut est app")
-    func defaultCategory() {
-        withSpy { spy in
+    func defaultCategory() async {
+        await withSpy { spy in
             Log.info("démarrage")
             #expect(spy.entries.first?.category == .app)
         }
     }
 
     @Test("le seuil de niveau écarte ce qui est en dessous")
-    func levelThreshold() {
-        withSpy(minimumLevel: .warning) { spy in
+    func levelThreshold() async {
+        await withSpy(minimumLevel: .warning) { spy in
             Log.debug("d")
             Log.info("i")
             Log.warning("w")
@@ -82,8 +81,8 @@ struct LogTests {
     }
 
     @Test("une catégorie retirée disparaît entièrement")
-    func categoryFilter() {
-        withSpy(categories: [.network]) { spy in
+    func categoryFilter() async {
+        await withSpy(categories: [.network]) { spy in
             Log.info("réseau", category: .network)
             Log.info("appli", category: .app)
             Log.info("stockage", category: .persistence)
@@ -93,10 +92,10 @@ struct LogTests {
     }
 
     @Test("un message filtré n'est même pas construit")
-    func filteredMessageIsNeverBuilt() {
+    func filteredMessageIsNeverBuilt() async {
         let counter = MessageCounter()
 
-        withSpy(minimumLevel: .error) { _ in
+        await withSpy(minimumLevel: .error) { _ in
             Log.debug(counter.build())
             Log.info(counter.build())
             #expect(counter.buildCount == 0, "l'autoclosure n'a pas été évaluée")
@@ -107,10 +106,10 @@ struct LogTests {
     }
 
     @Test("un message d'une catégorie écartée n'est pas construit non plus")
-    func filteredCategoryMessageIsNeverBuilt() {
+    func filteredCategoryMessageIsNeverBuilt() async {
         let counter = MessageCounter()
 
-        withSpy(categories: [.network]) { _ in
+        await withSpy(categories: [.network]) { _ in
             Log.info(counter.build(), category: .app)
             #expect(counter.buildCount == 0)
         }
@@ -127,35 +126,32 @@ struct LogTests {
     }
 
     @Test("plusieurs destinations reçoivent toutes la même trace")
-    func multipleDestinations() {
+    func multipleDestinations() async {
         let first = SpyDestination()
         let second = SpyDestination()
-        Log.configure(LogConfiguration(destinations: [first, second]))
 
-        Log.info("partagée")
+        await Log.withConfiguration(LogConfiguration(destinations: [first, second])) {
+            Log.info("partagée")
+        }
 
         #expect(first.messages == ["partagée"])
         #expect(second.messages == ["partagée"])
-        Log.configure(.silent)
     }
 
     @Test("ajouter une destination ne retire pas les autres")
     func addKeepsExisting() {
-        let first = SpyDestination()
-        let second = SpyDestination()
-        Log.configure(LogConfiguration(destinations: [first]))
+        // `add` agit sur la configuration **globale**, donc on vérifie son effet sur la
+        // configuration plutôt qu'en observant des écritures : observer capterait aussi
+        // les traces des suites qui tournent en parallèle.
+        let before = Log.current.destinations.count
+        Log.add(SpyDestination())
 
-        Log.add(second)
-        Log.info("après ajout")
-
-        #expect(first.messages == ["après ajout"])
-        #expect(second.messages == ["après ajout"])
-        Log.configure(.silent)
+        #expect(Log.current.destinations.count == before + 1)
     }
 
     @Test("la trace porte le fichier et la ligne d'appel, pas ceux du logger")
-    func capturesCallSite() {
-        withSpy { spy in
+    func capturesCallSite() async {
+        await withSpy { spy in
             Log.info("ici")
 
             #expect(spy.entries.first?.file == "LogTests.swift")

@@ -641,16 +641,37 @@ Pour une app qui a déjà un pipeline SwiftyBeaver ailleurs :
 SwiftyBeaver.addDestination(SwiftyBeaverBridge(writing: file))
 ```
 
-### Brancher les autres modules
+### Les autres modules tracent déjà
 
-`SUNetworking` définit son propre `NetworkLogger` pour rester indépendant. Le pont tient en
-trois lignes, côté app :
+`SUPersistence`, `SUNetworking` et `SUFirestore` dépendent de `SULogger` et écrivent
+d'eux-mêmes — rien à câbler.
+
+| Catégorie | Qui écrit |
+|---|---|
+| `persistence` | clés lues et écrites, absences, **échecs de décodage** |
+| `network` | départ et arrivée de chaque requête, 4xx/5xx en avertissement |
+| `firestore` | chemins, merges, lots, transactions, **reprises sur contention** |
+
+`SULogger` est **la seule** exception à la règle « les modules sont indépendants » : c'est
+une brique transverse, et elle n'a aucune dépendance externe.
+
+Pour router ailleurs — Crashlytics, Sentry — il reste les points d'extension :
 
 ```swift
-struct AppNetworkLogger: NetworkLogger {
-    func log(_ event: NetworkEvent) { Log.debug("\(event)", category: .network) }
+LoggingMiddleware(logger: MonLoggerÀMoi())          // côté réseau
+Log.add(CrashlyticsDestination())                    // pour tout le reste
+```
+
+### Détailler un chemin sans inonder le reste
+
+```swift
+try await Log.withConfiguration(LogConfiguration(minimumLevel: .debug)) {
+    try await leCheminQuOnDébogue()
 }
 ```
+
+La configuration est **task-local** : elle vaut pour cet arbre de tâches et lui seul. Les
+autres gardent la configuration globale — ce qui rend aussi les tests parallèles sûrs.
 
 ---
 

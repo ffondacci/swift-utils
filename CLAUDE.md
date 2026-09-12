@@ -240,6 +240,13 @@ ne peut appartenir qu'à un workspace ouvert à la fois :
 Un utilitaire ne dépend d'un autre utilitaire que si Florent l'a validé explicitement.
 Par défaut, les modules sont indépendants.
 
+**`SULogger` est l'exception, et la seule.** C'est une brique transverse — tracer concerne
+tout le monde — et elle n'a aucune dépendance externe, donc l'importer ne coûte rien à
+personne. Les autres modules en dépendent et tracent directement, au lieu d'obliger chaque
+app à recâbler un protocole de journal par module.
+
+L'inverse reste interdit : `SULogger` ne dépend de rien.
+
 ## Le trait n'élague que si rien n'est épinglé
 
 `Package.resolved` **n'est pas versionné**, et ce n'est pas un oubli.

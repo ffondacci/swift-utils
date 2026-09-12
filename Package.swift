@@ -77,10 +77,12 @@ let package = Package(
     targets: [
         .target(
             name: "SUPersistence",
+            dependencies: ["SULogger"],
             swiftSettings: commonSwiftSettings
         ),
         .target(
             name: "SUNetworking",
+            dependencies: ["SULogger"],
             swiftSettings: commonSwiftSettings
         ),
         .target(
@@ -101,6 +103,7 @@ let package = Package(
         ),
         .target(
             name: "SUFirestore",
+            dependencies: ["SULogger"],
             swiftSettings: commonSwiftSettings
         ),
         .target(
@@ -117,7 +120,7 @@ let package = Package(
         ),
         .testTarget(
             name: "SUPersistenceTests",
-            dependencies: ["SUPersistence"],
+            dependencies: ["SUPersistence", "SULogger"],
             swiftSettings: commonSwiftSettings
         ),
         .testTarget(
@@ -142,7 +145,7 @@ let package = Package(
         ),
         .testTarget(
             name: "SUFirestoreTests",
-            dependencies: ["SUFirestore"],
+            dependencies: ["SUFirestore", "SULogger"],
             swiftSettings: commonSwiftSettings
         ),
     ]

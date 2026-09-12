@@ -1,4 +1,5 @@
 import Foundation
+import SULogger
 
 /// Rejoue les opérations qui ont échoué de façon transitoire.
 ///
@@ -119,6 +120,12 @@ public struct RetryingFirestore: FirestoreClient {
                     throw error
                 }
                 attempt += 1
+                // En `.warning` : une reprise n'est pas une panne, mais une app qui en
+                // enchaîne dix a un problème que personne ne verrait sans trace.
+                Log.warning(
+                    "reprise \(attempt)/\(policy.maxRetries) après \(error)",
+                    category: .firestore
+                )
                 do {
                     // L'attente *est* le comportement voulu : sans elle, rejouer une
                     // contention la reproduit à l'identique.
