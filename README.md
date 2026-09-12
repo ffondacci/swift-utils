@@ -290,6 +290,51 @@ bannière d'erreur sans les câbler à la main.
 L'ordre compte : le premier est le plus extérieur. `RetryMiddleware` se place **après**
 `TokenMiddleware`, pour que chaque tentative reparte avec un jeton valide.
 
+### Cloud Functions appelables
+
+Le format `onCall` emballe la requête dans `{"data": …}` et rend `{"result": …}`.
+`SUNetworking` connaît l'enveloppe.
+
+Un type par fonction, quand elle a une identité :
+
+```swift
+struct SendFeedback: CallableEndpoint {
+    typealias Response = Confirmation
+    let payload: Feedback
+    var functionName: String { "sendFeedback" }
+}
+
+let confirmation = try await network.send(SendFeedback(payload: feedback))
+```
+
+Ou la forme courte, réglable au point d'appel :
+
+```swift
+let confirmation: Confirmation = try await network.send(
+    Callable("sendFeedback", payload: feedback)
+)
+
+// une fonction sans argument
+let stats: Stats = try await network.send(Callable("dailyStats"))
+
+// et tout est réglable, un paramètre à la fois
+let confirmation: Confirmation = try await network.send(
+    Callable(
+        "sendFeedback",
+        payload: feedback,
+        headers: ["X-Debug": "1"],
+        authentication: .optional,
+        policy: RequestPolicy(timeout: .seconds(5), retry: .none)
+    )
+)
+```
+
+Les défauts — `POST`, authentification obligatoire, chemin égal au nom de la fonction,
+service `.cloudFunctions` — tiennent tant qu'on ne les touche pas. Surcharger l'un n'en
+fait perdre aucun autre.
+
+`.cloudFunctions` n'est **qu'un nom** : l'URL reste dans votre `APIEnvironment`.
+
 ### Firebase sans le SDK Firebase
 
 `TokenMiddleware` ne connaît pas Firebase. Il demande un jeton à un `TokenProvider`, que

@@ -59,6 +59,36 @@ Trois conséquences qu'on vérifie à chaque revue :
   mentionne ni `UserDefaults`, ni `URL`, ni `Data`, ni `ModelContext`.
 - Chaque couche est testable seule, avec un double en mémoire de la couche du dessous.
 
+## Personnalisation — tout a un défaut, tout est surchargeable
+
+C'est la deuxième règle du dépôt, après la separation of concerns. Une API doit se
+laisser utiliser en trois mots, **et** se laisser régler dans le détail sans qu'on ait à
+renoncer aux autres défauts.
+
+```swift
+Callable("sendFeedback", payload: feedback)                    // le cas courant
+Callable("sendFeedback", payload: feedback,                    // et tout le reste
+         headers: ["X-Debug": "1"], authentication: .optional,
+         policy: RequestPolicy(timeout: .seconds(5), retry: .none))
+```
+
+Concrètement :
+
+- **Chaque paramètre a une valeur par défaut** dès qu'un choix raisonnable existe. Un
+  appelant ne doit jamais fournir une valeur qu'il n'a pas d'avis dessus.
+- **Surcharger un réglage n'en fait perdre aucun autre.** Pas de « mode avancé » qui
+  oblige à tout redéclarer : ce sont des paramètres nommés indépendants, pas un objet de
+  configuration à construire en entier.
+- **Les protocoles portent leurs défauts en extension**, pour que se conformer coûte le
+  minimum. `Endpoint` n'exige que `service`, `path` et le type de réponse ; les huit
+  autres membres ont un défaut.
+- **Deux formes coexistent quand les deux ont du sens** : un type par cas quand il a une
+  identité (`SendFeedback`), une forme générique réglable au point d'appel quand il n'en a
+  pas (`Callable`).
+
+Un test le vérifie explicitement à chaque fois : surcharger un réglage et constater que les
+autres défauts tiennent.
+
 ## Concurrence
 
 Swift 6 strict, **zéro warning de concurrence**. Un warning de concurrence est un bug

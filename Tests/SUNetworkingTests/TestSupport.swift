@@ -13,6 +13,7 @@ extension APIService {
 let testEnvironment = APIEnvironment([
     .test: URL(string: "https://api.example.com/v1")!,
     .other: URL(string: "https://other.example.com")!,
+    .cloudFunctions: URL(string: "https://europe-west1-lensy.cloudfunctions.net")!,
 ])
 
 // MARK: - Valeurs
@@ -84,6 +85,24 @@ struct GetWithFastRetry: Endpoint {
             retry: RetryPolicy(maxRetries: 2, backoff: .constant(.milliseconds(1)))
         )
     }
+}
+
+// MARK: - Fonctions appelables
+
+struct Feedback: Codable, Sendable, Equatable {
+    var message: String
+    var rating: Int
+}
+
+struct Confirmation: Codable, Sendable, Equatable {
+    var id: String
+}
+
+/// La forme « un type par fonction ».
+struct SendFeedback: CallableEndpoint {
+    typealias Response = Confirmation
+    let payload: Feedback
+    var functionName: String { "sendFeedback" }
 }
 
 // MARK: - Doubles
@@ -163,6 +182,11 @@ struct FailingClient: APIClient {
 }
 
 // MARK: - Raccourcis
+
+/// Une réponse au format `onCall` : la valeur est toujours emballée dans `result`.
+func callableJSON(_ id: String = "a") -> String {
+    #"{"result":{"id":"\#(id)"}}"#
+}
 
 func greetingJSON(_ message: String = "bonjour") -> String {
     #"{"message":"\#(message)"}"#
