@@ -56,6 +56,8 @@ let package = Package(
         .library(name: "SUPersistence", targets: ["SUPersistence"]),
         .library(name: "SUNetworking", targets: ["SUNetworking"]),
         .library(name: "SULogger", targets: ["SULogger"]),
+        .library(name: "SUStorage", targets: ["SUStorage"]),
+        .library(name: "SUStorageLive", targets: ["SUStorageLive"]),
         .library(name: "SUFirestore", targets: ["SUFirestore"]),
         .library(name: "SUFirestoreLive", targets: ["SUFirestoreLive"]),
     ],
@@ -96,6 +98,23 @@ let package = Package(
             swiftSettings: commonSwiftSettings
         ),
         .target(
+            name: "SUStorage",
+            dependencies: ["SULogger"],
+            swiftSettings: commonSwiftSettings
+        ),
+        .target(
+            name: "SUStorageLive",
+            dependencies: [
+                "SUStorage",
+                .product(
+                    name: "FirebaseStorage",
+                    package: "firebase-ios-sdk",
+                    condition: .when(traits: ["Firebase"])
+                ),
+            ],
+            swiftSettings: interopSwiftSettings
+        ),
+        .target(
             name: "SUFirestore",
             dependencies: ["SULogger"],
             swiftSettings: commonSwiftSettings
@@ -130,6 +149,11 @@ let package = Package(
         .testTarget(
             name: "SUFirestoreLiveTests",
             dependencies: ["SUFirestore", "SUFirestoreLive"],
+            swiftSettings: commonSwiftSettings
+        ),
+        .testTarget(
+            name: "SUStorageTests",
+            dependencies: ["SUStorage", "SULogger"],
             swiftSettings: commonSwiftSettings
         ),
         .testTarget(

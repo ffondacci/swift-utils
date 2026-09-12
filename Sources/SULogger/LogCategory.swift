@@ -17,6 +17,12 @@ public enum LogCategory: String, Sendable, Hashable, CaseIterable {
     /// Lectures et écritures **locales**, caches, migrations.
     case persistence
 
+    /// Fichiers : téléversements, téléchargements, métadonnées.
+    ///
+    /// Séparée de ``network`` : un transfert de vingt méga-octets et un appel d'API n'ont
+    /// ni la même durée, ni les mêmes échecs, et les mélanger rend les deux illisibles.
+    case storage
+
     /// Firestore : documents, requêtes, lots, transactions, contention.
     ///
     /// Séparée de ``persistence`` à dessein — quand une donnée est fausse, la première

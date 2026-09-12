@@ -572,6 +572,57 @@ Aucun projet Firebase n'existe derrière — `demo-` est reconnu comme factice.
 
 ---
 
+## SUStorage
+
+Téléverser, télécharger et lister des fichiers. L'adaptateur Firebase Storage vit dans
+`SUStorageLive`, derrière le trait **Firebase** ; le reste n'a aucune dépendance.
+
+```swift
+extension StorageFolder {
+    static let images: StorageFolder = "images"
+}
+
+// Téléverser depuis un fichier — une 4K ne passe pas par la mémoire
+try await storage.upload(
+    fileAt: localURL,
+    to: .images.object("u1/photo.jpg"),
+    metadata: UploadMetadata(contentType: "image/jpeg", custom: ["width": "3840"])
+) { progress in
+    self.fraction = progress.fraction        // nil si le total est inconnu
+}
+
+// Télécharger vers un fichier
+try await storage.download(.images.object("u1/photo.jpg"), to: destination)
+
+// En mémoire, sous garde de 10 Mo par défaut
+let thumbnail = try await storage.data(.images.object("u1/thumb.jpg"))
+
+let info = try await storage.metadata(of: .images.object("u1/photo.jpg"))
+let page = try await storage.list(in: .images, limit: 100)
+try await storage.delete(.images.object("u1/photo.jpg"))
+```
+
+### La progression est observée
+
+```swift
+@Environment(StorageStore.self) private var storage
+
+if let fraction = storage.overallProgress { ProgressView(value: fraction) }
+```
+
+Un transfert terminé disparaît de `transfers`, réussi ou non — la liste décrit ce qui se
+passe, pas un historique.
+
+### Trois gardes qui évitent des bugs silencieux
+
+- **Les chemins sont normalisés** : `/images//u1/photo.jpg/` et `images/u1/photo.jpg` sont
+  le même objet. Sans ça, une barre de trop crée un fichier que l'app ne retrouve jamais.
+- **`data(_:)` plafonne à 10 Mo** et jette au-delà, plutôt que de charger une 4K en RAM.
+- **`fraction` vaut `nil`** quand le serveur n'annonce pas de total — une barre déterminée
+  serait un mensonge.
+
+---
+
 ## SULogger
 
 Tracer ce que l'app fait, sans dépendance par défaut.
