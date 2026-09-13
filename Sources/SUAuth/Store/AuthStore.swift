@@ -58,6 +58,22 @@ public final class AuthStore {
     /// ``AuthState/isResolving`` le distingue d'une vraie déconnexion.
     public var isSignedIn: Bool { state.isSignedIn }
 
+    /// Connecté avec un compte **anonyme**.
+    ///
+    /// ```swift
+    /// if auth.isAnonymous {
+    ///     CreateAccountBanner()      // ses données sont perdues avec l'appareil
+    /// }
+    /// ```
+    public var isAnonymous: Bool { state.isAnonymous }
+
+    /// Connecté avec un **vrai** compte, lié à au moins un fournisseur.
+    ///
+    /// Les deux ne sont pas l'inverse l'un de l'autre : déconnecté, les deux valent
+    /// `false`. C'est ce qui évite d'afficher un écran de profil à quelqu'un qui n'est pas
+    /// entré.
+    public var hasPermanentAccount: Bool { state.hasPermanentAccount }
+
     public init(client: any AuthClient) {
         self.client = client
         // L'abonnement démarre tout de suite : un store qu'il faudrait penser à amorcer

@@ -603,6 +603,15 @@ try await auth.signOut()
 try await auth.signIn(with: ProviderCredential(provider: .apple, idToken: token, rawNonce: nonce))
 ```
 
+### Savoir où on en est
+
+```swift
+if auth.isAnonymous       { CreateAccountBanner() }
+if auth.hasPermanentAccount { ProfileScreen() }
+```
+
+Les deux ne sont pas l'inverse l'un de l'autre : déconnecté, les deux valent `false`.
+
 ### Lier un compte anonyme sans perdre ses données
 
 ```swift

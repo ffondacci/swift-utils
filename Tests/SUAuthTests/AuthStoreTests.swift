@@ -127,6 +127,24 @@ struct AuthStoreTests {
         #expect(linked.providers.contains(.apple))
     }
 
+    @Test("anonyme et compte durable ne sont pas l'inverse l'un de l'autre")
+    func anonymousAndPermanentAreDistinct() async throws {
+        let (store, _) = await makeStore()
+
+        // Déconnecté : ni l'un ni l'autre. C'est ce qui évite d'afficher un écran de
+        // profil — ou une bannière « créez un compte » — à quelqu'un qui n'est pas entré.
+        #expect(store.isAnonymous == false)
+        #expect(store.hasPermanentAccount == false)
+
+        _ = try await store.signInAnonymously()
+        #expect(store.isAnonymous)
+        #expect(store.hasPermanentAccount == false)
+
+        _ = try await store.link(ProviderCredential(provider: .apple, idToken: "jeton"))
+        #expect(store.isAnonymous == false)
+        #expect(store.hasPermanentAccount)
+    }
+
     @Test("lier deux fois le même fournisseur est refusé")
     func doubleLinkIsRefused() async throws {
         let (store, _) = await makeStore()

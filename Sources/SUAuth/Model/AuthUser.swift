@@ -103,6 +103,21 @@ public enum AuthState: Sendable, Equatable {
     /// Vrai tant que le service n'a pas répondu. C'est le moment d'afficher un écran
     /// d'attente, pas un écran de connexion.
     public var isResolving: Bool { self == .unknown }
+
+    /// Connecté **avec un compte anonyme**.
+    ///
+    /// Déconnecté rend `false` : la question « dois-je proposer de créer un compte ? » n'a
+    /// de sens que pour quelqu'un qui est déjà entré.
+    public var isAnonymous: Bool { user?.isAnonymous == true }
+
+    /// Connecté **avec un vrai compte**, lié à au moins un fournisseur.
+    ///
+    /// C'est la condition d'un écran de profil, d'un changement de mot de passe, de tout
+    /// ce qui n'a pas de sens pour un compte anonyme.
+    public var hasPermanentAccount: Bool {
+        guard let user else { return false }
+        return !user.isAnonymous
+    }
 }
 
 /// Une revendication personnalisée, telle qu'elle arrive dans le jeton.
