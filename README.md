@@ -1,11 +1,11 @@
 # swift-utils
 
-Boîte à outils Swift. Chaque utilitaire est un module et un produit SPM indépendants, à
-consommer à la carte.
+A Swift toolbox. Every utility is an independent module and SPM product, to pick à la
+carte.
 
-- **Plateformes** : iOS 18+, macOS 15+, watchOS 11+, tvOS 18+, visionOS 2+
-- **Swift** : 6 (concurrence stricte)
-- **Dépendances** : aucune, hors SDK Apple
+- **Platforms**: iOS 18+, macOS 15+, watchOS 11+, tvOS 18+, visionOS 2+
+- **Swift**: 6 (strict concurrency)
+- **Dependencies**: none beyond the Apple SDKs
 
 ```swift
 .package(url: "https://github.com/ffondacci/swift-utils.git", from: "1.0.0")
@@ -15,11 +15,11 @@ consommer à la carte.
 
 ## SUPersistence
 
-Sauvegarder et relire des valeurs, sans que l'app sache où elles sont rangées.
+Save and read back values, without the app knowing where they are stored.
 
-### Déclarer ses clés
+### Declare your keys
 
-Une clé lie un nom de stockage, un type, et la valeur rendue quand rien n'a été écrit.
+A key binds a storage name, a type, and the value returned when nothing has been written.
 
 ```swift
 import SUPersistence
@@ -33,11 +33,11 @@ extension PersistenceKey where Value == Profile? {
 }
 ```
 
-### Injecter le store
+### Inject the store
 
 ```swift
 @main
-struct LensyApp: App {
+struct MyApp: App {
     var body: some Scene {
         WindowGroup { RootView() }
             .environment(PersistenceStore.shared)
@@ -45,29 +45,29 @@ struct LensyApp: App {
 }
 ```
 
-`PersistenceStore.shared` s'adosse à `UserDefaults.standard`. Pour un autre support :
+`PersistenceStore.shared` is backed by `UserDefaults.standard`. For another medium:
 
 ```swift
 let store = try PersistenceStore(.jsonFile(named: "settings"))
 let preview = PersistenceStore.inMemory()
 ```
 
-### Lire et écrire
+### Read and write
 
 ```swift
 struct RootView: View {
     @Environment(PersistenceStore.self) private var store
 
     var body: some View {
-        Toggle("Onboarding vu", isOn: .constant(store[.onboardingDone]))
+        Toggle("Onboarding seen", isOn: .constant(store[.onboardingDone]))
             .task { try? await store.load(.onboardingDone) }
     }
 }
 ```
 
-La lecture par `store[.key]` est **synchrone et observée** : elle rend ce qui est en
-cache, et la vue se redessine quand le cache change. `load(_:)` va chercher la valeur sur
-le support, `save(_:for:)` l'y écrit — les deux sont `async throws`.
+Reading through `store[.key]` is **synchronous and observed**: it returns what is cached,
+and the view redraws when the cache changes. `load(_:)` fetches the value from the medium,
+`save(_:for:)` writes it there; both are `async throws`.
 
 ```swift
 try await store.save(true, for: .onboardingDone)
@@ -75,11 +75,11 @@ try await store.remove(.onboardingDone)
 try await store.removeAll()
 ```
 
-### « Est-ce la première fois ? »
+### "Is this the first time?"
 
-Le besoin revient dans presque toutes les apps : ne montrer un onboarding qu'une fois,
-n'expliquer une permission qu'au premier refus, ne signaler une nouveauté qu'une fois par
-mise à jour. Le store a un vocabulaire dédié pour ça.
+Almost every app needs it: show an onboarding only once, explain a permission only after
+the first refusal, announce a new feature once per update. The store has a dedicated
+vocabulary for it.
 
 ```swift
 extension SeenKey {
@@ -89,31 +89,31 @@ extension SeenKey {
 ```
 
 ```swift
-// Marque la chose comme vue, et dit si c'était la première fois.
+// Marks the thing as seen, and tells whether it was the first time.
 .task {
     showOnboarding = try await store.markAsSeen(.onboarding)
 }
 
-// Ou séparément
+// Or separately
 let seen = try await store.hasBeenSeen(.onboarding)
-try await store.setHasBeenSeen(false, for: .onboarding)   // « revoir l'introduction »
+try await store.setHasBeenSeen(false, for: .onboarding)   // "show the intro again"
 ```
 
-`markAsSeen(_:)` est la forme à préférer quand la lecture ne sert qu'à décider d'un
-affichage : deux appels concurrents sur la même clé ne rendent `true` qu'une seule fois,
-là où un `hasBeenSeen` suivi d'un `setHasBeenSeen` laisserait passer un double affichage.
+Prefer `markAsSeen(_:)` when the read only decides whether to show something: two
+concurrent calls on the same key return `true` only once, where `hasBeenSeen` followed by
+`setHasBeenSeen` would let a double display through.
 
-`hasBeenSeenCached(_:)` existe aussi, synchrone et observée pour les `body`. Attention à
-son défaut : elle rend `false` tant que la clé n'a pas été chargée, et `false` veut dire
-« jamais vue ». Ne l'utilisez pas seule pour décider d'un premier affichage.
+`hasBeenSeenCached(_:)` also exists, synchronous and observed for `body`. Mind its default:
+it returns `false` until the key has been loaded, and `false` means "never seen". Do not
+use it alone to decide a first display.
 
-Les marques vivent dans leur propre espace de noms : une marque `onboarding` n'écrase
-jamais une préférence `onboarding`.
+Marks live in their own namespace: an `onboarding` mark never overwrites an `onboarding`
+preference.
 
 ### Collections
 
-Une clé désigne une valeur ; une collection en désigne un nombre quelconque, adressées par
-identifiant. C'est ce qu'il faut pour garder localement ce qu'une API a rendu.
+A key names one value; a collection names any number of them, addressed by identifier.
+That is what you need to keep locally what an API returned.
 
 ```swift
 extension PersistenceCollection where Value == Profile {
@@ -121,21 +121,21 @@ extension PersistenceCollection where Value == Profile {
 }
 
 try await store.save(profile, id: profile.id, in: .profiles)
-let un    = try await store.load(id: "u1", from: .profiles)
-let tous  = try await store.loadAll(from: .profiles)
-let actifs = try await store.filter(.profiles) { $0.visits > 10 }
-let ids   = try await store.ids(in: .profiles)        // sans charger les valeurs
+let one    = try await store.load(id: "u1", from: .profiles)
+let all    = try await store.loadAll(from: .profiles)
+let active = try await store.filter(.profiles) { $0.visits > 10 }
+let ids    = try await store.ids(in: .profiles)        // without loading the values
 try await store.removeAll(from: .profiles)
 ```
 
-Une collection `profiles` et une clé `profiles` ne se croisent jamais. `loadAll` **jette**
-dès qu'une entrée est illisible : après un changement de modèle, on veut le savoir et
-vider, pas récupérer un sous-ensemble amputé en silence.
+A `profiles` collection and a `profiles` key never collide. `loadAll` **throws** as soon as
+one entry is unreadable: after a model change, you want to know and clear, not silently
+get a truncated subset.
 
-### Fraîcheur
+### Freshness
 
-Toute valeur est horodatée à l'écriture. De quoi décider entre le cache local et un appel
-réseau, sans tenir un registre à côté :
+Every value is timestamped on write. Enough to choose between the local cache and a
+network call, without keeping a separate registry:
 
 ```swift
 if let entry = try await store.stored(.catalog),
@@ -146,37 +146,36 @@ return try await network.send(FetchCatalog())
 ```
 
 ```swift
-// ou, plus court
+// or, shorter
 if try await store.needsRefresh(.catalog, after: .seconds(3600)) { … }
 ```
 
-`stored(_:)` distingue aussi « jamais écrit » de « écrit une valeur égale au défaut », ce
-que `load(_:)` ne peut pas faire.
+`stored(_:)` also tells "never written" apart from "written a value equal to the default",
+which `load(_:)` cannot do.
 
-### Supports disponibles
+### Available media
 
-| Support | Pour quoi |
+| Medium | For what |
 |---|---|
-| `.userDefaults` | Petites valeurs de préférence. Le défaut. |
-| `.userDefaultsSuite(named:)` | App group partagé, ou isolation d'un test. |
-| `.jsonFile(named:)` | Un document JSON unique. Réécrit en entier à chaque écriture : parfait pour des réglages, inadapté à une grosse collection. |
-| `.jsonDirectory(named:)` | Un fichier JSON **par clé**. Le support des collections volumineuses. |
-| `.inMemory` | Previews SwiftUI et tests. Rien n'atteint le disque. |
+| `.userDefaults` | Small preference values. The default. |
+| `.userDefaultsSuite(named:)` | Shared app group, or isolating a test. |
+| `.jsonFile(named:)` | A single JSON document. Rewritten in full on every write: perfect for settings, wrong for a large collection. |
+| `.jsonDirectory(named:)` | One JSON file **per key**. The medium for large collections. |
+| `.inMemory` | SwiftUI previews and tests. Nothing reaches the disk. |
 
-SwiftData et SQLite viendront s'ajouter comme backends supplémentaires, sans changement
-d'API.
+SwiftData and SQLite will come as additional backends, with no API change.
 
 ### Architecture
 
 ```
-Store ────────── surface publique, @MainActor @Observable, cache observé
-Repository ───── typage, clés, valeurs par défaut
+Store ────────── public surface, @MainActor @Observable, observed cache
+Repository ───── typing, keys, default values
 Coder ────────── Value <-> Data
-Backend ──────── Data <-> support physique
+Backend ──────── Data <-> physical medium
 ```
 
-Chaque couche ne connaît que le **protocole** de celle du dessous. Un backend maison se
-branche sans toucher au reste :
+Each layer only knows the **protocol** of the one below. A custom backend plugs in
+without touching the rest:
 
 ```swift
 struct KeychainBackend: PersistenceBackend { /* … */ }
@@ -186,16 +185,16 @@ let store = PersistenceStore(
 )
 ```
 
-### Erreurs
+### Errors
 
-Tout ce qui peut échouer est `async throws(PersistenceError)`. Le type d'erreur est dans
-la signature, et chaque cas porte de quoi diagnostiquer — clé, type, raison :
+Everything that can fail is `async throws(PersistenceError)`. The error type is in the
+signature, and every case carries what you need to diagnose it: key, type, reason.
 
 ```swift
 do {
     try await store.load(.currentProfile)
 } catch {
-    print(error)  // Décodage de Profile impossible pour la clé « currentProfile » : …
+    print(error)  // Cannot decode Profile for key "currentProfile": …
 }
 ```
 
@@ -203,12 +202,11 @@ do {
 
 ## SUNetworking
 
-Appeler une API HTTP, sans que l'app connaisse `URLSession`.
+Call an HTTP API, without the app knowing `URLSession`.
 
-### Déclarer ses services et ses endpoints
+### Declare your services and endpoints
 
-**Le module n'en déclare aucun** — comme pour les clés de `SUPersistence`, ils appartiennent
-à l'app.
+**The module declares none**: like the keys of `SUPersistence`, they belong to the app.
 
 ```swift
 import SUNetworking
@@ -219,7 +217,7 @@ extension APIService {
 
 extension APIEnvironment {
     static let production = APIEnvironment([
-        .account: URL(string: "https://api.lensy.app/v1")!
+        .account: URL(string: "https://api.example.com/v1")!
     ])
 }
 
@@ -233,14 +231,15 @@ struct FetchProfile: Endpoint {
 }
 ```
 
-Tout a un défaut sauf le service, le chemin et le type de réponse : un `GET` public tient
-en trois lignes, et le décodage JSON est fourni dès que `Response` est `Decodable`.
+Everything has a default except the service, the path and the response type: a public
+`GET` fits in three lines, and JSON decoding comes for free as soon as `Response` is
+`Decodable`.
 
-### Monter le store
+### Set up the store
 
 ```swift
 @main
-struct LensyApp: App {
+struct MyApp: App {
     private let network = NetworkStore(
         environment: .production,
         middlewares: [
@@ -257,10 +256,10 @@ struct LensyApp: App {
 }
 ```
 
-`NetworkStore` n'a **pas** de `shared` : il lui faut les URL de base de vos services, que
-seule l'app connaît. Un singleton sans environnement ne pourrait que planter ou mentir.
+`NetworkStore` has **no** `shared`: it needs the base URLs of your services, which only the
+app knows. A singleton without an environment could only crash or lie.
 
-### Appeler
+### Call
 
 ```swift
 struct ProfileView: View {
@@ -275,27 +274,27 @@ struct ProfileView: View {
 }
 ```
 
-`isLoading` et `lastError` sont observés : de quoi piloter un indicateur global et une
-bannière d'erreur sans les câbler à la main.
+`isLoading` and `lastError` are observed: enough to drive a global spinner and an error
+banner without wiring them by hand.
 
 ### Middlewares
 
-| Middleware | Rôle |
+| Middleware | Role |
 |---|---|
-| `DefaultHeadersMiddleware` | En-têtes communs. Un en-tête posé par l'endpoint n'est jamais écrasé. |
-| `TokenMiddleware` | Joint un jeton, et rejoue **une** fois sur 401 avec un jeton rafraîchi. |
-| `RetryMiddleware` | Rejoue les pannes transitoires : backoff exponentiel avec jitter, `Retry-After` respecté, verbes non idempotents épargnés. |
-| `LoggingMiddleware` | Raconte chaque requête au `NetworkLogger` de l'app. |
+| `DefaultHeadersMiddleware` | Common headers. A header set by the endpoint is never overwritten. |
+| `TokenMiddleware` | Attaches a token, and replays **once** on 401 with a refreshed token. |
+| `RetryMiddleware` | Replays transient failures: exponential backoff with jitter, `Retry-After` honored, non-idempotent verbs spared. |
+| `LoggingMiddleware` | Reports every request to the app's `NetworkLogger`. |
 
-L'ordre compte : le premier est le plus extérieur. `RetryMiddleware` se place **après**
-`TokenMiddleware`, pour que chaque tentative reparte avec un jeton valide.
+Order matters: the first one is the outermost. Put `RetryMiddleware` **after**
+`TokenMiddleware`, so every attempt starts again with a valid token.
 
-### Cloud Functions appelables
+### Callable Cloud Functions
 
-Le format `onCall` emballe la requête dans `{"data": …}` et rend `{"result": …}`.
-`SUNetworking` connaît l'enveloppe.
+The `onCall` format wraps the request in `{"data": …}` and returns `{"result": …}`.
+`SUNetworking` knows the envelope.
 
-Un type par fonction, quand elle a une identité :
+One type per function, when it has an identity:
 
 ```swift
 struct SendFeedback: CallableEndpoint {
@@ -307,17 +306,17 @@ struct SendFeedback: CallableEndpoint {
 let confirmation = try await network.send(SendFeedback(payload: feedback))
 ```
 
-Ou la forme courte, réglable au point d'appel :
+Or the short form, tunable at the call site:
 
 ```swift
 let confirmation: Confirmation = try await network.send(
     Callable("sendFeedback", payload: feedback)
 )
 
-// une fonction sans argument
+// a function without arguments
 let stats: Stats = try await network.send(Callable("dailyStats"))
 
-// et tout est réglable, un paramètre à la fois
+// and everything is tunable, one parameter at a time
 let confirmation: Confirmation = try await network.send(
     Callable(
         "sendFeedback",
@@ -329,37 +328,37 @@ let confirmation: Confirmation = try await network.send(
 )
 ```
 
-Les défauts — `POST`, authentification obligatoire, chemin égal au nom de la fonction,
-service `.cloudFunctions` — tiennent tant qu'on ne les touche pas. Surcharger l'un n'en
-fait perdre aucun autre.
+The defaults (`POST`, authentication required, path equal to the function name, service
+`.cloudFunctions`) hold as long as you do not touch them. Overriding one loses none of the
+others.
 
-`.cloudFunctions` n'est **qu'un nom** : l'URL reste dans votre `APIEnvironment`.
+`.cloudFunctions` is **only a name**: the URL stays in your `APIEnvironment`.
 
-Une fonction qui ne rend rien répond `{"result": null}`. `NoResult` absorbe le cas :
+A function that returns nothing answers `{"result": null}`. `NoResult` absorbs the case:
 
 ```swift
 let _: NoResult = try await network.send(Callable("markAsRead", payload: id))
 ```
 
-Et une `HttpsError` remonte **typée**, pas en JSON à parser :
+And an `HttpsError` comes back **typed**, not as JSON to parse:
 
 ```swift
 catch NetworkError.serviceFailed(_, let code, let message) {
-    // code == "PERMISSION_DENIED", message == "pas le droit"
+    // code == "PERMISSION_DENIED", message == "not allowed"
 }
 ```
 
-C'est le point d'accroche `Endpoint.mapError(_:statusCode:)`, disponible pour n'importe
-quelle API qui décrit ses échecs. Son défaut rend `nil`, et le client produit alors son
-erreur générique — un corps d'une forme inattendue n'est jamais réinterprété de force.
+This is the `Endpoint.mapError(_:statusCode:)` hook, available to any API that describes
+its failures. Its default returns `nil`, and the client then produces its generic error: a
+body of an unexpected shape is never forcibly reinterpreted.
 
-> Ces formats ne sont pas devinés : ils sont vérifiés contre un émulateur Firebase réel.
-> Voir `Tests/Fixtures/emulator/`.
+> These formats are not guessed: they are checked against a real Firebase emulator.
+> See `Tests/Fixtures/emulator/`.
 
-### Firebase sans le SDK Firebase
+### Firebase without the Firebase SDK
 
-`TokenMiddleware` ne connaît pas Firebase. Il demande un jeton à un `TokenProvider`, que
-l'app implémente :
+`TokenMiddleware` does not know Firebase. It asks a `TokenProvider` for a token, which the
+app implements:
 
 ```swift
 struct FirebaseTokenProvider: TokenProvider {
@@ -369,19 +368,19 @@ struct FirebaseTokenProvider: TokenProvider {
 }
 ```
 
-Le même middleware sert pour App Check, sur un autre en-tête et sans schéma :
+The same middleware serves App Check, on another header and without a scheme:
 
 ```swift
 TokenMiddleware(provider: AppCheckProvider(), header: "X-Firebase-AppCheck", scheme: nil)
 ```
 
-Aucune dépendance n'entre dans le package, et toute la chaîne d'authentification se teste
-avec un fournisseur de trois lignes.
+No dependency enters the package, and the whole authentication chain is testable with a
+three-line provider.
 
-### Tester
+### Testing
 
-`MockTransport` ne touche jamais au réseau, et enregistre ce qu'on lui demande — de quoi
-affirmer *comment* la requête a été formée, pas seulement ce qu'elle a rendu.
+`MockTransport` never touches the network, and records what it is asked: enough to assert
+*how* the request was built, not only what it returned.
 
 ```swift
 let transport = MockTransport([.status(200, json: #"{"name":"Florent"}"#)])
@@ -397,16 +396,16 @@ let profile = try await store.send(FetchProfile(userID: "42"))
 
 ## SUFirestore
 
-Lire, écrire et interroger Firestore, sans que l'app connaisse le SDK.
+Read, write and query Firestore, without the app knowing the SDK.
 
-> **Le SDK Firebase est derrière un trait.** Sans lui, `firebase-ios-sdk` n'est ni
-> téléchargé ni compilé — 0 octet pour une app qui ne fait que de la persistance. Avec, ce
-> sont 144 Mo et 14 paquets, assumés.
+> **The Firebase SDK sits behind a trait.** Without it, `firebase-ios-sdk` is neither
+> downloaded nor compiled: 0 bytes for an app that only does persistence. With it, 144 MB
+> and 14 packages, knowingly.
 >
-> Dans Xcode, cocher le trait **Firebase** au moment d'ajouter le paquet. En ligne de
-> commande : `swift build --traits Firebase`.
+> In Xcode, tick the **Firebase** trait when adding the package. From the command line:
+> `swift build --traits Firebase`.
 
-### Déclarer ses chemins
+### Declare your paths
 
 ```swift
 import SUFirestore
@@ -416,19 +415,19 @@ extension CollectionPath where Value == Profile {
 }
 ```
 
-### Monter le store
+### Set up the store
 
 ```swift
 import FirebaseCore
 import SUFirestoreLive
 
 init() {
-    AppCheck.setAppCheckProviderFactory(MyFactory())   // AVANT
-    FirebaseApp.configure()                             // puis
+    AppCheck.setAppCheckProviderFactory(MyFactory())   // FIRST
+    FirebaseApp.configure()                             // then
     firestore = FirestoreStore(
         client: RetryingFirestore(
             wrapping: LiveFirestore(configuration: FirestoreConfiguration(
-                offlinePersistence: false      // le cache disque, désactivé par défaut
+                offlinePersistence: false      // the disk cache, off by default
             )),
             policy: .default
         )
@@ -436,23 +435,23 @@ init() {
 }
 ```
 
-`SUFirestore` ne configure **jamais** Firebase : `FirebaseApp.configure()` doit être appelé
-exactement une fois, et seule l'app peut le garantir. App Check s'installe avant.
+`SUFirestore` **never** configures Firebase: `FirebaseApp.configure()` must be called
+exactly once, and only the app can guarantee it. App Check goes in before.
 
 ### CRUD
 
 ```swift
-let profile = try await store.document("u1", in: .profiles)          // nil si absent
-try await store.setDocument(profile, id: "u1", in: .profiles)        // remplace
-try await store.setDocument(patch, id: "u1", in: .profiles, merge: true)   // fusionne
-try await store.updateDocument(["visits": 5], id: "u1", in: .profiles)     // doit exister
+let profile = try await store.document("u1", in: .profiles)          // nil if missing
+try await store.setDocument(profile, id: "u1", in: .profiles)        // replaces
+try await store.setDocument(patch, id: "u1", in: .profiles, merge: true)   // merges
+try await store.updateDocument(["visits": 5], id: "u1", in: .profiles)     // must exist
 try await store.deleteDocument(id: "u1", in: .profiles)
 ```
 
-### Requêtes
+### Queries
 
 ```swift
-let actifs = try await store.documents(in: .profiles) {
+let active = try await store.documents(in: .profiles) {
     $0.where("visits", .isGreaterThan, 10)
       .where("premium", .isEqualTo, true)
       .order(by: "name")
@@ -460,7 +459,7 @@ let actifs = try await store.documents(in: .profiles) {
 }
 ```
 
-### Lots atomiques
+### Atomic batches
 
 ```swift
 try await store.batch { batch in
@@ -470,29 +469,28 @@ try await store.batch { batch in
 }
 ```
 
-Ou tout passe, ou rien. Au-delà de 500 écritures, le lot est refusé **avant** d'atteindre
-le réseau.
+All or nothing. Beyond 500 writes, the batch is refused **before** reaching the network.
 
-### Reprise sur contention
+### Retry on contention
 
-Deux appareils qui écrivent le même document au même instant : Firestore en abandonne un
-avec `aborted`. `RetryingFirestore` rejoue, et la seconde tentative trouve la voie libre.
+Two devices writing the same document at the same moment: Firestore aborts one with
+`aborted`. `RetryingFirestore` replays it, and the second attempt finds the way clear.
 
-| Rejoué | Jamais rejoué |
+| Replayed | Never replayed |
 |---|---|
 | `aborted` (contention) | `permissionDenied` |
-| `unavailable` (réseau) | `notFound`, `alreadyExists` |
+| `unavailable` (network) | `notFound`, `alreadyExists` |
 | `resourceExhausted` (quota) | `decodingFailed` |
 | `deadlineExceeded` | `failedPrecondition` |
 
-Backoff exponentiel avec jitter — sans l'aléa, les deux écritures qui se sont percutées
-reviendraient exactement ensemble.
+Exponential backoff with jitter: without the randomness, the two writes that collided would
+come back exactly together.
 
-> Les écritures Firestore sont **absolues** (`set`, `update`, `delete` décrivent un état
-> final), donc les rejouer aboutit au même document. C'est ce qui autorise la reprise sur
-> les écritures ici, là où `SUNetworking` épargne les `POST`.
+> Firestore writes are **absolute** (`set`, `update`, `delete` describe a final state), so
+> replaying them ends in the same document. That is what allows retrying writes here, where
+> `SUNetworking` spares `POST`.
 
-### Opérations serveur, pagination, provenance
+### Server operations, pagination, provenance
 
 ```swift
 try await store.updateDocument(["visits": .increment(1)], id: "u1", in: .profiles)
@@ -504,63 +502,63 @@ let page = try await store.documents(in: .profiles) {
 
 if let snapshot = try await store.snapshot("u1", in: .profiles),
    snapshot.metadata.isFromCache {
-    banner = "Hors ligne"
+    banner = "Offline"
 }
 ```
 
-`increment` est la **seule** opération relative du module, et une écriture qui en contient
-une n'est jamais rejouée — la rejouer après un timeout douteux compterait deux fois.
+`increment` is the **only** relative operation in the module, and a write that contains one
+is never replayed: replaying it after an uncertain timeout would count twice.
 
 ### Transactions
 
-Un lot écrit sans lire. Une transaction **lit d'abord et décide ensuite** — ce qu'il faut
-dès que la nouvelle valeur dépend de l'ancienne autrement que par un incrément.
+A batch writes without reading. A transaction **reads first and decides next**: what you
+need as soon as the new value depends on the old one other than through an increment.
 
 ```swift
 try await store.transaction { transaction in
-    guard let compte = try transaction.document("c1", in: .comptes),
-          compte.solde >= montant
+    guard let account = try transaction.document("a1", in: .accounts),
+          account.balance >= amount
     else {
-        throw InsufficientFunds()          // n'importe quelle erreur abandonne
+        throw InsufficientFunds()          // any error aborts
     }
-    transaction.set(compte.débité(de: montant), id: "c1", in: .comptes)
+    transaction.set(account.debited(by: amount), id: "a1", in: .accounts)
 }
 ```
 
-Deux règles que le double en mémoire **vérifie**, pour qu'on les découvre en test et non en
-production :
+Two rules that the in-memory double **enforces**, so you find them in tests and not in
+production:
 
-- **Toutes les lectures avant toutes les écritures.** Firestore l'impose ; lire après avoir
-  écrit jette une `invalidArgument`.
-- **Le corps peut être rejoué** en cas de conflit — n'y mettez aucun effet de bord.
+- **All reads before all writes.** Firestore requires it; reading after writing throws
+  `invalidArgument`.
+- **The body may be replayed** on conflict: put no side effect in it.
 
-### Erreurs
+### Errors
 
-`FirestoreError` nomme les codes plutôt que de les compter : `permissionDenied`,
-`notFound`, `unavailable`, `unauthenticated`, `aborted`, `failedPrecondition`… Et
-`failedPrecondition` **extrait l'URL de création de l'index** que Firestore glisse dans
-son message.
+`FirestoreError` names the codes instead of numbering them: `permissionDenied`,
+`notFound`, `unavailable`, `unauthenticated`, `aborted`, `failedPrecondition`… And
+`failedPrecondition` **extracts the index-creation URL** that Firestore slips into its
+message.
 
 ```swift
 catch let error where error.requiresReauthentication { showLogin() }
 catch let error where error.isRetryable { showOfflineBanner() }
 ```
 
-### Tester
+### Testing
 
-`InMemoryFirestore` honore le même contrat — écritures, requêtes, lots, atomicité — sans
-projet Firebase, sans réseau, et **sans le SDK dans le graphe de dépendances** :
+`InMemoryFirestore` honors the same contract (writes, queries, batches, atomicity) with no
+Firebase project, no network, and **no SDK in the dependency graph**:
 
 ```swift
 let store = FirestoreStore.inMemory()
 try await store.setDocument(profile, id: "u1", in: .profiles)
 ```
 
-Il ne rejoue ni les règles de sécurité, ni les index composites : il teste **votre** code,
-pas Firestore.
+It replays neither security rules nor composite indexes: it tests **your** code, not
+Firestore.
 
-Et pour vérifier que le double dit bien la vérité, `Tests/Fixtures/emulator/` fait tourner
-les mêmes scénarios contre un **vrai Firestore** local :
+And to check that the double tells the truth, `Tests/Fixtures/emulator/` runs the same
+scenarios against a **real** local Firestore:
 
 ```bash
 cd Tests/Fixtures/emulator
@@ -568,30 +566,30 @@ firebase emulators:start --only functions,firestore --project demo-swift-utils
 SU_EMULATOR=1 swift test --traits Firebase
 ```
 
-Aucun projet Firebase n'existe derrière — `demo-` est reconnu comme factice.
+No Firebase project exists behind it: `demo-` is recognized as a placeholder.
 
 ---
 
 ## SUAuth
 
-Connexion, état de session, jetons, gestion de compte. L'adaptateur `FirebaseAuth` vit dans
-`SUAuthLive`, derrière le trait **Firebase**.
+Sign-in, session state, tokens, account management. The `FirebaseAuth` adapter lives in
+`SUAuthLive`, behind the **Firebase** trait.
 
-### Trois états, pas deux
+### Three states, not two
 
 ```swift
 switch auth.state {
-case .unknown:         ProgressView()      // la session se restaure
+case .unknown:         ProgressView()      // the session is being restored
 case .signedOut:       SignInScreen()
 case .signedIn(let u): HomeScreen(user: u)
 }
 ```
 
-**C'est le piège numéro un.** Confondre `unknown` avec `signedOut` fait clignoter un écran
-de connexion devant quelqu'un qui était déjà connecté. Le store s'abonne tout seul au flux
-d'état à sa construction.
+**This is trap number one.** Mistaking `unknown` for `signedOut` flashes a sign-in screen
+at someone who was already signed in. The store subscribes to the state stream on its own
+when it is built.
 
-### Se connecter
+### Signing in
 
 ```swift
 try await auth.signUp(email: email, password: password)
@@ -599,30 +597,30 @@ try await auth.signIn(email: email, password: password)
 try await auth.signInAnonymously()
 try await auth.signOut()
 
-// Fournisseurs tiers : aucun SDK de connexion dans le module
+// Third-party providers: no sign-in SDK in the module
 try await auth.signIn(with: ProviderCredential(provider: .apple, idToken: token, rawNonce: nonce))
 ```
 
-### Lier un compte anonyme sans perdre ses données
+### Linking an anonymous account without losing its data
 
 ```swift
-let anonyme = try await auth.signInAnonymously()
-let lié = try await auth.link(ProviderCredential(provider: .apple, idToken: token))
-lié.id == anonyme.id        // vrai — tout ce qui est rattaché à cet id survit
+let anonymous = try await auth.signInAnonymously()
+let linked = try await auth.link(ProviderCredential(provider: .apple, idToken: token))
+linked.id == anonymous.id        // true: everything attached to this id survives
 ```
 
-### Les opérations sensibles
+### Sensitive operations
 
 ```swift
 do {
-    try await auth.updatePassword(nouveau)
+    try await auth.updatePassword(newPassword)
 } catch let error where error.requiresReauthentication {
-    try await auth.reauthenticate(password: ancien)
-    try await auth.updatePassword(nouveau)
+    try await auth.reauthenticate(password: oldPassword)
+    try await auth.updatePassword(newPassword)
 }
 ```
 
-### Le pont vers SUNetworking
+### The bridge to SUNetworking
 
 ```swift
 struct FirebaseTokens: TokenProvider {
@@ -633,39 +631,39 @@ struct FirebaseTokens: TokenProvider {
 }
 ```
 
-### Trois propriétés d'erreur, trois réactions
+### Three error properties, three reactions
 
-| | Ce que l'app fait |
+| | What the app does |
 |---|---|
-| `isUserCorrectable` | afficher le message **sous le champ** concerné |
-| `requiresReauthentication` | demander le mot de passe, puis rejouer |
-| `isRetryable` | proposer de réessayer |
+| `isUserCorrectable` | show the message **under the field** concerned |
+| `requiresReauthentication` | ask for the password, then replay |
+| `isRetryable` | offer to try again |
 
 ---
 
 ## SUStorage
 
-Téléverser, télécharger et lister des fichiers. L'adaptateur Firebase Storage vit dans
-`SUStorageLive`, derrière le trait **Firebase** ; le reste n'a aucune dépendance.
+Upload, download and list files. The Firebase Storage adapter lives in `SUStorageLive`,
+behind the **Firebase** trait; the rest has no dependency.
 
 ```swift
 extension StorageFolder {
     static let images: StorageFolder = "images"
 }
 
-// Téléverser depuis un fichier — une 4K ne passe pas par la mémoire
+// Upload from a file: a 4K image never goes through memory
 try await storage.upload(
     fileAt: localURL,
     to: .images.object("u1/photo.jpg"),
     metadata: UploadMetadata(contentType: "image/jpeg", custom: ["width": "3840"])
 ) { progress in
-    self.fraction = progress.fraction        // nil si le total est inconnu
+    self.fraction = progress.fraction        // nil if the total is unknown
 }
 
-// Télécharger vers un fichier
+// Download to a file
 try await storage.download(.images.object("u1/photo.jpg"), to: destination)
 
-// En mémoire, sous garde de 10 Mo par défaut
+// In memory, under a 10 MB guard by default
 let thumbnail = try await storage.data(.images.object("u1/thumb.jpg"))
 
 let info = try await storage.metadata(of: .images.object("u1/photo.jpg"))
@@ -673,7 +671,7 @@ let page = try await storage.list(in: .images, limit: 100)
 try await storage.delete(.images.object("u1/photo.jpg"))
 ```
 
-### La progression est observée
+### Progress is observed
 
 ```swift
 @Environment(StorageStore.self) private var storage
@@ -681,122 +679,117 @@ try await storage.delete(.images.object("u1/photo.jpg"))
 if let fraction = storage.overallProgress { ProgressView(value: fraction) }
 ```
 
-Un transfert terminé disparaît de `transfers`, réussi ou non — la liste décrit ce qui se
-passe, pas un historique.
+A finished transfer leaves `transfers`, successful or not: the list describes what is
+happening, not a history.
 
-### Trois gardes qui évitent des bugs silencieux
+### Three guards against silent bugs
 
-- **Les chemins sont normalisés** : `/images//u1/photo.jpg/` et `images/u1/photo.jpg` sont
-  le même objet. Sans ça, une barre de trop crée un fichier que l'app ne retrouve jamais.
-- **`data(_:)` plafonne à 10 Mo** et jette au-delà, plutôt que de charger une 4K en RAM.
-- **`fraction` vaut `nil`** quand le serveur n'annonce pas de total — une barre déterminée
-  serait un mensonge.
+- **Paths are normalized**: `/images//u1/photo.jpg/` and `images/u1/photo.jpg` are the
+  same object. Without that, one slash too many creates a file the app never finds again.
+- **`data(_:)` caps at 10 MB** and throws beyond, rather than loading a 4K image in RAM.
+- **`fraction` is `nil`** when the server announces no total: a determinate bar would be a
+  lie.
 
 ---
 
 ## SULogger
 
-Tracer ce que l'app fait, sans dépendance par défaut.
+Trace what the app does, with no dependency by default.
 
 ```swift
 import SULogger
 
-Log.configure(.default)                       // OSLog, tout niveau
+Log.configure(.default)                       // OSLog, every level
 
-Log.info("session démarrée")
-Log.error("échec : \(error)", category: .network)
-Log.debug("cache relu", category: .persistence)
+Log.info("session started")
+Log.error("failed: \(error)", category: .network)
+Log.debug("cache reloaded", category: .persistence)
 ```
 
-Trois catégories — `app`, `network`, `persistence` — qui deviennent la `category` d'OSLog :
-c'est elle qui permet de filtrer dans Console.app ou `log stream` sans tout noyer.
+Three categories (`app`, `network`, `persistence`) that become the OSLog `category`: it is
+what lets you filter in Console.app or `log stream` without drowning in everything.
 
-### Le message n'est construit que s'il sert
+### The message is only built when it is used
 
 ```swift
-Log.debug("\(gros.description)")      // en production, jamais évalué
+Log.debug("\(huge.description)")      // never evaluated in production
 ```
 
-C'est un `@autoclosure` : filtré par le niveau ou la catégorie, la chaîne n'est **jamais**
-construite. Un test le vérifie en comptant les constructions.
+It is an `@autoclosure`: filtered out by level or category, the string is **never** built.
+A test checks it by counting the constructions.
 
-### Régler
+### Tuning
 
 ```swift
 Log.configure(LogConfiguration(
-    minimumLevel: .warning,               // en dessous, rien
-    categories: [.network],               // isoler un domaine
+    minimumLevel: .warning,               // nothing below
+    categories: [.network],               // isolate one domain
     destinations: [OSLogDestination()]
 ))
 ```
 
-`.silent` coupe tout — pratique en test.
+`.silent` turns everything off, handy in tests.
 
-### Écrire dans un fichier
+### Writing to a file
 
-Disponible par défaut, sans dépendance.
+Available by default, with no dependency.
 
 ```swift
 let file = try FileDestination()                        // Library/Logs/app.log
 Log.configure(LogConfiguration(destinations: [OSLogDestination(), file]))
 
-// pour un rapport de support
+// for a support report
 let urls = file.allFileURLs
-let poids = file.totalSize
+let size = file.totalSize
 try file.reset()
 ```
 
-Rotation par taille (5 Mo) et nombre d'archives (3) par défaut. La rotation a lieu **avant**
-l'écriture : la ligne la plus récente est toujours dans le fichier courant, et aucun fichier
-ne dépasse la taille annoncée.
+Rotation by size (5 MB) and archive count (3) by default. Rotation happens **before** the
+write: the latest line is always in the current file, and no file exceeds the announced
+size.
 
-> Le handle reste ouvert et la taille est suivie en mémoire. Rouvrir et re-`stat` le
-> fichier à chaque ligne a un coût mesuré dans `UniLogger`, qui l'a corrigé de la même
-> façon.
+> The handle stays open and the size is tracked in memory. Reopening and re-`stat`ing the
+> file on every line has a measurable cost.
 
-### Les autres modules tracent déjà
+### The other modules already log
 
-`SUPersistence`, `SUNetworking` et `SUFirestore` dépendent de `SULogger` et écrivent
-d'eux-mêmes — rien à câbler.
+`SUPersistence`, `SUNetworking` and `SUFirestore` depend on `SULogger` and write on their
+own: nothing to wire.
 
-| Catégorie | Qui écrit |
+| Category | Who writes |
 |---|---|
-| `persistence` | clés lues et écrites, absences, **échecs de décodage** |
-| `network` | départ et arrivée de chaque requête, 4xx/5xx en avertissement |
-| `firestore` | chemins, merges, lots, transactions, **reprises sur contention** |
+| `persistence` | keys read and written, misses, **decoding failures** |
+| `network` | start and end of every request, 4xx/5xx as warnings |
+| `firestore` | paths, merges, batches, transactions, **contention retries** |
 
-`SULogger` est **la seule** exception à la règle « les modules sont indépendants » : c'est
-une brique transverse, et elle n'a aucune dépendance externe.
+`SULogger` is **the only** exception to the "modules are independent" rule: it is a
+cross-cutting brick, and it has no external dependency.
 
-Pour router ailleurs — Crashlytics, Sentry — il reste les points d'extension :
+To route elsewhere (Crashlytics, Sentry), the extension points remain:
 
 ```swift
-LoggingMiddleware(logger: MonLoggerÀMoi())          // côté réseau
-Log.add(CrashlyticsDestination())                    // pour tout le reste
+LoggingMiddleware(logger: MyLogger())                // network side
+Log.add(CrashlyticsDestination())                    // for everything else
 ```
 
-### Détailler un chemin sans inonder le reste
+### Detailing one path without flooding the rest
 
 ```swift
 try await Log.withConfiguration(LogConfiguration(minimumLevel: .debug)) {
-    try await leCheminQuOnDébogue()
+    try await thePathBeingDebugged()
 }
 ```
 
-La configuration est **task-local** : elle vaut pour cet arbre de tâches et lui seul. Les
-autres gardent la configuration globale — ce qui rend aussi les tests parallèles sûrs.
+The configuration is **task-local**: it applies to this task tree and to it alone. The
+others keep the global configuration, which also makes parallel tests safe.
 
 ---
 
-## Développement
+## Development
 
-Ouvrir le package seul, pour le travailler et lancer ses tests :
+Open the package on its own, to work on it and run its tests:
 
 ```bash
 open Package.swift
 swift test
 ```
-
-Pour l'éditer **en direct** depuis une app consommatrice, voir la section
-« Intégration dans une app » de `CLAUDE.md` : la dépendance reste déclarée par URL remote,
-et un workspace de développement l'override en local.

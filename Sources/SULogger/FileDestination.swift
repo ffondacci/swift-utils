@@ -14,9 +14,9 @@ import Synchronization
 /// let urls = file.archivedFileURLs   // à joindre à un rapport de support
 /// ```
 ///
-/// > **Le handle reste ouvert**, et la taille est suivie en mémoire. Rouvrir et re-`stat`
-/// > le fichier à chaque ligne — ce que fait la destination fichier de SwiftyBeaver — a un
-/// > coût mesuré dans `UniLogger`, qui l'a corrigé de la même façon.
+/// > **The handle stays open**, and the size is tracked in memory. Reopening and
+/// > re-`stat`ing the file on every line, as SwiftyBeaver's file destination does, has a
+/// > measurable cost.
 public final class FileDestination: LogDestination {
 
     /// Ce qui gouverne la rotation.
